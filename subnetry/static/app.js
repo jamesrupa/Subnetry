@@ -782,7 +782,6 @@ function renderWifi(data) {
   const CANDIDATE_NOTE = { "2.4 GHz": "Least overlap among 1 / 6 / 11", "5 GHz": "Quietest channel without radar checks (non-DFS)",
     "6 GHz": "Quietest preferred scanning channel (PSC)" };
   $("#wifi-recs").innerHTML = [
-    ["Networks found", nets.length, `${new Set(nets.map((n) => n.ssid).filter(Boolean)).size} unique SSIDs`],
     connected && ["Connected to", connected.redacted ? "Hidden by macOS" : esc(connected.ssid || "(hidden)"),
       `${esc(connected.band || "")} · channel ${connected.channel ?? "?"} · ${connected.signal_dbm ?? "?"} dBm (${quality(connected.signal_dbm).label})`],
     conn && (conn.change
