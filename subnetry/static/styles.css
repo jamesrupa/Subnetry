@@ -67,6 +67,7 @@ body {
 }
 h1 { font-size: 22px; margin: 0; }
 h2 { font-size: 15px; margin: 24px 0 10px; }
+[hidden] { display: none !important; }  /* also for elements whose class sets display, e.g. .toolbar */
 .muted { color: var(--text-secondary); margin: 2px 0 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 a { color: var(--accent); }
@@ -668,3 +669,9 @@ tr.hl td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .improve-list b { display: block; }
 .improve-list p { margin: 4px 0 0; color: var(--text-secondary); font-size: 14px; }
 .improve-list div { min-width: 0; overflow-wrap: anywhere; }
+
+/* --- DNSDumpster ------------------------------------------------------------------------------ */
+#dd-key { width: 320px; }
+.dd-help { flex-basis: 100%; }
+#dd-card .table-wrap td .sub { white-space: normal; }
+@media (max-width: 640px) { #dd-key { width: 100%; } .toolbar label:has(#dd-key) { flex-basis: 100%; } }

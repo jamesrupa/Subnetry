@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .tools import dashboard, diagnose, dnsinfo, ipinfo, macos, macvendor, portref, subnetcalc, netinfo, netscan, nmapscan, ookla, report, speedtest, traffic, wifimonitor, wifiscan
+from .tools import dashboard, diagnose, dnsdumpster, dnsinfo, ipinfo, macos, macvendor, portref, subnetcalc, netinfo, netscan, nmapscan, ookla, report, speedtest, traffic, wifimonitor, wifiscan
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -137,6 +137,30 @@ async def dns_lookup(q: str, resolver: str = Query("system", pattern="^(system|c
         return await dnsinfo.lookup(q, resolver)
     except dnsinfo.DnsError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/dnsdumpster/status")
+async def dnsdumpster_status():
+    return dnsdumpster.status()
+
+
+@app.post("/api/dnsdumpster/key")
+async def dnsdumpster_key(request: Request):
+    """Save (or, with an empty key, remove) the DNSDumpster API key. The key is never sent back."""
+    body = await request.json()
+    key = str(body.get("key") or "").strip() if isinstance(body, dict) else ""
+    if key and (len(key) < 16 or len(key) > 200 or any(c.isspace() for c in key)):
+        raise HTTPException(400, "That doesn't look like a DNSDumpster API key.")
+    await asyncio.to_thread(dnsdumpster.save_key, key)
+    return dnsdumpster.status()
+
+
+@app.get("/api/dnsdumpster")
+async def dnsdumpster_lookup(q: str):
+    try:
+        return await dnsdumpster.lookup(q)
+    except dnsdumpster.DumpsterError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
 
 
 @app.get("/api/dns/explainers")

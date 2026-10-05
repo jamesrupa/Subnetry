@@ -536,11 +536,31 @@
       <form class="toolbar" id="dns-form">
         <label>Domain or IP <input id="dns-q" placeholder="example.com" spellcheck="false"></label>
         <label>Ask <select id="dns-resolver"></select></label>
+        <label class="check" title="Also find the domain's subdomains and hosts with DNSDumpster"><input type="checkbox" id="dd-include"> Include DNSDumpster</label>
         <button class="btn primary" type="submit">Look up</button>
       </form>
       <div class="status-row"><span id="dns-radar"></span><p class="status" id="dns-status">Enter a domain (or an IP address for reverse DNS).</p></div>
       <div id="dns-findings"></div>
       <div id="dns-results"></div>
+      <div class="card top-gap" id="dd-card">
+        <div class="card-head">
+          <h2>Hosts &amp; subdomains (DNSDumpster)</h2>
+          <span class="sub" id="dd-key-state"></span>
+        </div>
+        <p class="sub">DNSDumpster lists a domain's publicly known hosts (from passive DNS data and internet scans), with
+          the network and country of each address. Useful for spotting forgotten test servers or services you didn't know were public.</p>
+        <form id="dd-setup" class="toolbar top-gap-sm" hidden>
+          <label>DNSDumpster API key <input id="dd-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key"></label>
+          <button class="btn primary" type="submit">Save key</button>
+          <span class="sub dd-help">Free: create an account at <a href="https://dnsdumpster.com/" target="_blank" rel="noopener noreferrer">dnsdumpster.com</a>,
+            then copy the API key from your account page. It's stored only on this computer.</span>
+        </form>
+        <div class="toolbar top-gap-sm" id="dd-actions" hidden>
+          <button class="btn" type="button" id="dd-run">Search DNSDumpster</button>
+        </div>
+        <div class="status-row"><span id="dd-radar"></span><p class="status" id="dd-status"></p></div>
+        <div id="dd-results"></div>
+      </div>
       <h2>Record types explained</h2>
       <div class="explainers" id="dns-explainers"></div>
     </section>

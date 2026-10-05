@@ -211,3 +211,18 @@ def test_window_icon_is_ico_on_windows():
         w, h, _, _, planes, bits, size, offset = struct.unpack("<BBBBHHII", data[6 + 16 * i:22 + 16 * i])
         assert bits == 32 and offset + size <= len(data)
         assert struct.unpack("<I", data[offset:offset + 4])[0] == 40, f"frame {w or 256}px is not a BMP"
+
+
+def test_fallback_opens_the_browser_only_once(monkeypatch, tmp_path):
+    """The window fails at once: the main thread falls back; the watchdog must not open a second tab later."""
+    import time as _time
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(desktop_app, "WINDOW_TIMEOUT", 0.3)
+    opened, fallback = [], []
+    monkeypatch.setattr("webbrowser.open", opened.append)
+    monkeypatch.setattr(desktop_app, "_serve_in_browser", lambda url, thread, open_browser: fallback.append(open_browser))
+    _fake_webview(monkeypatch, lambda w: None)  # returns at once, never shown
+    assert desktop_app.run_window("127.0.0.1", 18769)
+    _time.sleep(0.8)  # well past the watchdog's timeout
+    assert fallback == [True] and opened == []

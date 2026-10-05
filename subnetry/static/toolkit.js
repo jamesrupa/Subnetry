@@ -238,7 +238,7 @@ function dnsTypeCard(type, res) {
   return `<div class="card">${head}${body}</div>`;
 }
 
-async function dnsLookup() {
+async function dnsLookup({ skipDumpster = false } = {}) {
   const q = $("#dns-q").value.trim();
   if (!q) return;
   const status = $("#dns-status");
@@ -268,6 +268,7 @@ async function dnsLookup() {
       $("#dns-results").innerHTML = `<div class="dns-grid">${present.map((t) => dnsTypeCard(t, r.results[t])).join("")}${extra}</div>`
         + (missing.length ? `<p class="sub top-gap-sm">Not present: ${esc(missing.join(" · "))}</p>` : "");
       $("#dns-findings").innerHTML = r.findings.length ? `<h2>What we noticed</h2>${r.findings.map(recCard).join("")}` : "";
+      if (!skipDumpster && ddStatus?.configured && $("#dd-include").checked) ddLookup(r.query);
     }
   } catch (err) {
     setStatus(status, esc(err.message), true);
@@ -280,6 +281,7 @@ let dnsLoaded = false;
 loaders.dns = async () => {
   if (dnsLoaded) return;
   dnsLoaded = true;
+  ddRefreshStatus();
   const data = await api("/api/dns/explainers");
   $("#dns-resolver").innerHTML = Object.entries(data.resolvers).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
   $("#dns-explainers").innerHTML = data.explainers.map((x) => `
@@ -289,3 +291,123 @@ loaders.dns = async () => {
       <p>${esc(x.details)}</p>
     </details>`).join("");
 };
+
+
+// --- DNSDumpster (hosts & subdomains) ------------------------------------------------------------------
+
+let ddStatus = null;
+let ddDomain = "";
+
+function ddPref(value) {
+  try {
+    if (value === undefined) return localStorage.getItem("subnetry.dd-include") !== "0";
+    localStorage.setItem("subnetry.dd-include", value ? "1" : "0");
+  } catch { /* storage unavailable: default on */ }
+  return true;
+}
+
+async function ddRefreshStatus() {
+  try { ddStatus = await api("/api/dnsdumpster/status"); } catch { return; }
+  const on = ddStatus.configured;
+  $("#dd-setup").hidden = on;
+  $("#dd-actions").hidden = !on;
+  $("#dd-include").disabled = !on;
+  $("#dd-include").checked = on && ddPref();
+  $("#dd-key-state").innerHTML = on
+    ? (ddStatus.source === "env" ? "API key from DNSDUMPSTER_API_KEY"
+      : `API key ${esc(ddStatus.hint || "saved")} · <button class="link" type="button" id="dd-change">Change</button> · <button class="link" type="button" id="dd-remove">Remove</button>`)
+    : "Not set up";
+  if (!on && !$("#dd-results").innerHTML) setStatus($("#dd-status"), "");
+}
+
+async function ddLookup(domain) {
+  domain = (domain || $("#dns-q").value).trim();
+  if (!domain) { setStatus($("#dd-status"), "Enter a domain above first.", true); return; }
+  ddDomain = domain;
+  const status = $("#dd-status");
+  setStatus(status, `Asking DNSDumpster about ${esc(domain)}…`);
+  $("#dd-radar").innerHTML = radarSVG(28);
+  $("#dd-results").innerHTML = "";
+  $("#dd-run").disabled = true;
+  try {
+    const r = await api(`/api/dnsdumpster?q=${encodeURIComponent(domain)}`);
+    if (domain !== ddDomain) return;  // a newer lookup started meanwhile
+    const n = r.hosts.length;
+    setStatus(status, `${n} record${n === 1 ? "" : "s"} for ${esc(r.domain)} · ${r.unique_ips} unique IP address${r.unique_ips === 1 ? "" : "es"}`
+      + (r.cached ? ` · from ${esc(r.fetched_at)} (cached)` : ""));
+    $("#dd-results").innerHTML = ddRender(r);
+  } catch (err) {
+    setStatus(status, esc(err.message), true);
+    if (/rejected the API key/.test(err.message)) ddRefreshStatus();
+  } finally {
+    $("#dd-radar").innerHTML = "";
+    $("#dd-run").disabled = false;
+  }
+}
+
+function ddRender(r) {
+  const counts = Object.entries(r.counts).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(" · ") || "none";
+  const tiles = [
+    tile("Hosts found", r.counts.A + r.counts.AAAA + r.counts.CNAME, esc(counts)),
+    tile("Unique IPs", r.unique_ips),
+    r.asns.length && tile("Main network", esc(r.asns[0][0]), r.asns.length > 1 ? `+ ${r.asns.length - 1} other${r.asns.length > 2 ? "s" : ""}` : "", "small"),
+    r.countries.length && tile("Hosted in", esc(r.countries.map(([c]) => c).slice(0, 3).join(", ")), r.countries.length > 3 ? `+ ${r.countries.length - 3} more` : "", "small"),
+  ].filter(Boolean).join("");
+  const notable = r.notable.length ? recCard({
+    severity: "info", category: "DNSDumpster", title: `${r.notable.length} host name${r.notable.length === 1 ? "" : "s"} worth a second look`,
+    detail: `${r.notable.slice(0, 12).join(", ")}${r.notable.length > 12 ? "…" : ""}. Names like dev, test, staging, admin or vpn are often `
+      + "forgotten or less protected than the main site, and anyone can find them this way.",
+    action: "Check each one is still needed and properly secured (updates, login, HTTPS). Remove the DNS records of anything retired.",
+  }) : "";
+  const rows = r.hosts.flatMap((h) => (h.ips.length ? h.ips : [{}]).map((ip, i) => `<tr>
+      <td><span class="badge${h.type === "MX" || h.type === "NS" ? "" : " accent"}">${esc(h.type)}</span></td>
+      <td class="mono">${i ? "" : `<button class="link dd-host" type="button" data-host="${esc(h.host)}" title="Look up ${esc(h.host)}">${esc(h.host)}</button>`
+        + (h.priority != null ? ` <span class="sub" style="display:inline">priority ${h.priority}</span>` : "")}</td>
+      <td class="mono">${esc(ip.ip || "–")}</td>
+      <td>${esc(ip.asn_name || "–")}${ip.asn ? `<span class="sub">AS${esc(ip.asn)}${ip.asn_range ? ` · ${esc(ip.asn_range)}` : ""}</span>` : ""}</td>
+      <td>${esc(ip.country || "–")}</td>
+      <td class="mono">${esc(ip.ptr || "–")}</td>
+      <td>${ip.banners ? Object.entries(ip.banners).map(([p, b]) => `<span class="sub">${esc(p)}: ${esc(typeof b === "string" ? b
+        : [b.server, b.title, b.cn].filter(Boolean).join(" · ") || Object.values(b).slice(0, 2).join(" · "))}</span>`).join("") : "–"}</td>
+    </tr>`)).join("");
+  const more = r.more_available
+    ? `<p class="sub top-gap-sm">Showing ${r.shown_a} of ${r.total_a} A records. DNSDumpster's paid plan returns the rest.</p>` : "";
+  const txt = r.txt.length ? `<details class="explainer top-gap-sm"><summary><b>TXT records (${r.txt.length})</b></summary>
+      <ul class="spf-terms">${r.txt.map((t) => `<li><code>${esc(t)}</code></li>`).join("")}</ul></details>` : "";
+  return `<div class="tiles top-gap-sm">${tiles}</div>${notable}
+    <div class="table-wrap flat scroll-y tall top-gap-sm"><table>
+      <thead><tr><th>Type</th><th>Host</th><th>IP address</th><th>Network (ASN)</th><th>Country</th><th>Reverse DNS</th><th>Services seen</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="7" class="empty">DNSDumpster has no host records for this domain.</td></tr>`}</tbody>
+    </table></div>${more}${txt}`;
+}
+
+$("#dd-setup").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const key = $("#dd-key").value.trim();
+  if (!key) return;
+  try {
+    await api("/api/dnsdumpster/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) });
+    $("#dd-key").value = "";
+    ddPref(true);
+    await ddRefreshStatus();
+    setStatus($("#dd-status"), "API key saved. Look up a domain above, or press Search DNSDumpster.");
+  } catch (err) {
+    setStatus($("#dd-status"), esc(err.message), true);
+  }
+});
+$("#dd-card").addEventListener("click", async (e) => {
+  if (e.target.id === "dd-change") { $("#dd-setup").hidden = false; $("#dd-key").focus(); }
+  if (e.target.id === "dd-remove") {
+    await api("/api/dnsdumpster/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: "" }) });
+    $("#dd-results").innerHTML = "";
+    await ddRefreshStatus();
+    setStatus($("#dd-status"), "API key removed from this computer.");
+  }
+  if (e.target.classList.contains("dd-host")) {
+    $("#dns-q").value = e.target.dataset.host;
+    dnsLookup({ skipDumpster: true });  // one host's records; don't spend a DNSDumpster query on it
+    $("#tab-dns").scrollIntoView({ behavior: "smooth" });
+  }
+});
+$("#dd-run").addEventListener("click", () => ddLookup());
+$("#dd-include").addEventListener("change", (e) => ddPref(e.target.checked));

@@ -163,22 +163,30 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     window = webview.create_window("Subnetry", f"{url}?launch={int(time.time())}", width=1400, height=900, min_size=(900, 600),
                                    background_color="#060a12", text_select=True)
     shown = getattr(getattr(window, "events", None), "shown", None)
-    fell_back = threading.Event()
+    loop_ended = threading.Event()
+    fallback_claim = threading.Lock()  # whoever takes it (watchdog or main thread) handles the fallback, once
 
     def watchdog() -> None:
-        if shown is not None and not shown.wait(WINDOW_TIMEOUT):
-            fell_back.set()
-            _log(f"The window still hasn't appeared after {WINDOW_TIMEOUT} s.")
-            if sys.platform == "win32" and (sys.stdout is None or not sys.stdout.isatty()):
-                _serve_in_browser(url, thread, open_browser=True)  # returns when the message box is dismissed
-                _log("Stopped from the message box.")
-                os._exit(0)  # the window loop is stuck, so end the whole process
-            import webbrowser
+        if shown is None:
+            return
+        deadline = time.monotonic() + WINDOW_TIMEOUT
+        while time.monotonic() < deadline:
+            if shown.wait(0.25):
+                _log("Window shown.")
+                return
+            if loop_ended.is_set():
+                return  # the window loop already ended: the main thread deals with it
+        if not fallback_claim.acquire(blocking=False):
+            return
+        _log(f"The window still hasn't appeared after {WINDOW_TIMEOUT} s.")
+        if sys.platform == "win32" and (sys.stdout is None or not sys.stdout.isatty()):
+            _serve_in_browser(url, thread, open_browser=True)  # returns when the message box is dismissed
+            _log("Stopped from the message box.")
+            os._exit(0)  # the window loop is stuck, so end the whole process
+        import webbrowser
 
-            webbrowser.open(url)
-            _log(f"Opened {url} in your browser instead.")
-        elif shown is not None:
-            _log("Window shown.")
+        webbrowser.open(url)
+        _log(f"Opened {url} in your browser instead.")
 
     threading.Thread(target=watchdog, name="subnetry-window-watchdog", daemon=True).start()
     # Keep browser storage between runs (theme choice etc.); pywebview defaults to a private session.
@@ -198,9 +206,11 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
         except Exception as exc:  # e.g. no WebView2 / pythonnet on Windows, no GTK on Linux
             _log(f"The window couldn't start: {type(exc).__name__}: {exc}")
             break
+    loop_ended.set()
     if shown is not None and not shown.is_set():
         _log("The window never appeared.")
-        _serve_in_browser(url, thread, open_browser=not fell_back.is_set())
+        # If the watchdog already opened the browser, just keep serving it.
+        _serve_in_browser(url, thread, open_browser=fallback_claim.acquire(blocking=False))
     else:
         _log("Window closed.")
     server.should_exit = True
