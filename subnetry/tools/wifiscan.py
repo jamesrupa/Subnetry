@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import sys
+import time
 
 from ..system import IS_LINUX, IS_MAC, IS_WINDOWS, run_cmd
 from . import macos
@@ -194,7 +196,101 @@ def parse_netsh_networks(text: str, connected_bssid: str | None = None) -> list[
     return nets
 
 
+def request_windows_scan(timeout: float = 6.0) -> bool:
+    """Ask every Wi-Fi adapter to scan now, and wait until Windows says it's done.
+
+    `netsh wlan show networks` only reports Windows' cached scan results, which are refreshed
+    when something requests a scan (e.g. opening the Wi-Fi menu). Without this the list can be
+    stale and hold little more than the network you're connected to. Uses the Native Wi-Fi API
+    (WlanScan); no admin rights needed. Returns True if a scan was requested.
+    """
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    import threading
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("Data1", ctypes.c_ulong), ("Data2", ctypes.c_ushort), ("Data3", ctypes.c_ushort),
+                    ("Data4", ctypes.c_ubyte * 8)]
+
+    class WLAN_INTERFACE_INFO(ctypes.Structure):
+        _fields_ = [("InterfaceGuid", GUID), ("strInterfaceDescription", ctypes.c_wchar * 256),
+                    ("isState", ctypes.c_uint)]
+
+    class WLAN_INTERFACE_INFO_LIST(ctypes.Structure):
+        _fields_ = [("dwNumberOfItems", wintypes.DWORD), ("dwIndex", wintypes.DWORD),
+                    ("InterfaceInfo", WLAN_INTERFACE_INFO * 1)]
+
+    class WLAN_NOTIFICATION_DATA(ctypes.Structure):
+        _fields_ = [("NotificationSource", wintypes.DWORD), ("NotificationCode", wintypes.DWORD),
+                    ("InterfaceGuid", GUID), ("dwDataSize", wintypes.DWORD), ("pData", ctypes.c_void_p)]
+
+    SOURCE_NONE, SOURCE_ACM = 0, 0x08
+    SCAN_COMPLETE, SCAN_FAIL = 7, 8
+    try:
+        wlan = ctypes.WinDLL("wlanapi.dll")
+    except OSError:
+        return False
+    handle, version = wintypes.HANDLE(), wintypes.DWORD()
+    if wlan.WlanOpenHandle(2, None, ctypes.byref(version), ctypes.byref(handle)) != 0:
+        return False
+    callback = None
+    try:
+        ifaces = ctypes.POINTER(WLAN_INTERFACE_INFO_LIST)()
+        if wlan.WlanEnumInterfaces(handle, None, ctypes.byref(ifaces)) != 0:
+            return False
+        try:
+            count = ifaces.contents.dwNumberOfItems
+            first = ctypes.addressof(ifaces.contents.InterfaceInfo)
+            guids = [GUID.from_buffer_copy(WLAN_INTERFACE_INFO.from_address(first + i * ctypes.sizeof(WLAN_INTERFACE_INFO)).InterfaceGuid)
+                     for i in range(count)]
+        finally:
+            wlan.WlanFreeMemory(ifaces)
+        if not guids:
+            return False
+
+        pending = {bytes(g) for g in guids}
+        done = threading.Event()
+        lock = threading.Lock()
+        NOTIFY = ctypes.WINFUNCTYPE(None, ctypes.POINTER(WLAN_NOTIFICATION_DATA), ctypes.c_void_p)
+
+        def on_notify(data, _context):
+            d = data.contents
+            if d.NotificationSource == SOURCE_ACM and d.NotificationCode in (SCAN_COMPLETE, SCAN_FAIL):
+                with lock:
+                    pending.discard(bytes(d.InterfaceGuid))
+                    if not pending:
+                        done.set()
+
+        callback = NOTIFY(on_notify)  # keep a reference until we unregister
+        registered = wlan.WlanRegisterNotification(handle, SOURCE_ACM, True, callback, None, None, None) == 0
+        requested = False
+        for g in guids:
+            if wlan.WlanScan(handle, ctypes.byref(g), None, None, None) == 0:
+                requested = True
+            else:
+                with lock:
+                    pending.discard(bytes(g))
+        if requested:
+            if registered:
+                done.wait(timeout)
+            else:
+                time.sleep(4)  # a scan usually takes 2-4 s
+        return requested
+    except Exception:
+        return False
+    finally:
+        if callback is not None:
+            try:
+                wlan.WlanRegisterNotification(handle, SOURCE_NONE, True, None, None, None, None)
+            except Exception:
+                pass
+        wlan.WlanCloseHandle(handle, None)
+
+
 async def _scan_windows() -> list[dict]:
+    await asyncio.to_thread(request_windows_scan)  # refresh Windows' cached list before reading it
     iface = await run_cmd(["netsh", "wlan", "show", "interfaces"])
     connected = None
     if iface:
