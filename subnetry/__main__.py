@@ -6,10 +6,67 @@ import argparse
 import os
 import sys
 import threading
+import time
+import traceback
 import webbrowser
+from pathlib import Path
+
+
+def log_path() -> Path:
+    """Where the desktop app's messages go when there's no console to print them to."""
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Subnetry" / "Subnetry.log"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Logs" / "Subnetry.log"
+    return Path.home() / ".subnetry" / "Subnetry.log"
+
+
+def attach_log_if_windowless() -> Path | None:
+    """Started without a console (pythonw.exe from the Start-menu shortcut), sys.stdout and
+    sys.stderr are None: printing fails and uvicorn can't even set up its logging. Send both
+    to a log file instead. Returns the log's path, or None when there is a console."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return None
+    path = log_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        log = open(path, "a", encoding="utf-8", buffering=1)
+    except OSError:
+        log = open(os.devnull, "w", encoding="utf-8")
+    log.write(f"\n--- Subnetry started {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+    if sys.stdout is None:
+        sys.stdout = log
+    if sys.stderr is None:
+        sys.stderr = log
+    return path
+
+
+def show_error(message: str) -> None:
+    """A message box, so a failure is visible when the app was started without a console."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(None, message, "Subnetry", 0x10)  # MB_ICONERROR
+        except Exception:
+            pass
 
 
 def main() -> None:
+    log = attach_log_if_windowless()
+    try:
+        _main()
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as exc:
+        traceback.print_exc()
+        if log is None:
+            raise
+        show_error(f"Subnetry couldn't start:\n\n{exc}\n\nDetails are in {log}")
+        sys.exit(1)
+
+
+def _main() -> None:
     if sys.version_info < (3, 10):
         sys.exit(f"Subnetry needs Python 3.10 or newer (this is {sys.version.split()[0]}). "
                  "On macOS: `brew install python` or download it from python.org.")

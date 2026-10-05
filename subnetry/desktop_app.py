@@ -92,9 +92,8 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     thread = threading.Thread(target=server.run, name="subnetry-server", daemon=True)
     thread.start()
     if not wait_for_server(host, port):
-        print("Subnetry's server didn't start; see the messages above.", file=sys.stderr)
         server.should_exit = True
-        return True
+        raise RuntimeError(f"Subnetry's server didn't start on port {port}; see the messages above.")
 
     if sys.platform == "darwin":
         _brand_macos_process()

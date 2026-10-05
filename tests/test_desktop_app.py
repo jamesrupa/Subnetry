@@ -3,6 +3,8 @@ import sys
 import types
 import urllib.request
 
+import pytest
+
 from subnetry import desktop_app
 
 
@@ -78,3 +80,48 @@ def test_install_replaces_launcher_from_old_name(tmp_path, monkeypatch):
     unrelated.mkdir()
     assert desktop_app.remove_legacy_launchers() == [str(legacy)]
     assert not legacy.exists() and unrelated.exists()
+
+
+# --- started without a console (pythonw.exe from the Windows shortcut) ------------------------------
+
+def test_windowless_start_logs_to_file(tmp_path, monkeypatch):
+    from subnetry import __main__ as entry
+
+    monkeypatch.setattr(entry, "log_path", lambda: tmp_path / "logs" / "Subnetry.log")
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    path = entry.attach_log_if_windowless()
+    assert path == tmp_path / "logs" / "Subnetry.log"
+    print("hello from pythonw")
+    import uvicorn
+    uvicorn.Config("subnetry.server:app", log_level="warning").load()  # crashed with stdout=None
+    sys.stdout.flush()
+    assert "hello from pythonw" in path.read_text()
+
+
+def test_console_start_is_left_alone(monkeypatch):
+    from subnetry import __main__ as entry
+
+    assert entry.attach_log_if_windowless() is None
+
+
+def test_windowless_failure_shows_a_message(tmp_path, monkeypatch):
+    from subnetry import __main__ as entry
+
+    shown = []
+    monkeypatch.setattr(entry, "attach_log_if_windowless", lambda: tmp_path / "Subnetry.log")
+    monkeypatch.setattr(entry, "show_error", shown.append)
+    monkeypatch.setattr(entry, "_main", lambda: (_ for _ in ()).throw(RuntimeError("no WebView2")))
+    with pytest.raises(SystemExit):
+        entry.main()
+    assert "no WebView2" in shown[0] and "Subnetry.log" in shown[0]
+
+
+def test_log_path_per_platform(monkeypatch, tmp_path):
+    from subnetry import __main__ as entry
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert entry.log_path() == tmp_path / "Subnetry" / "Subnetry.log"
+    monkeypatch.setattr(sys, "platform", "darwin")
+    assert entry.log_path().parts[-3:] == ("Library", "Logs", "Subnetry.log")

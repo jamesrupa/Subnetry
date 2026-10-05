@@ -49,8 +49,9 @@ python -m subnetry --uninstall-app  # remove the launcher again
 `--install-app` creates **Subnetry.app** in `~/Applications` on macOS (open it from Launchpad or Spotlight and drag it to
 the Dock), Desktop and Start-menu shortcuts on Windows, or an app-menu entry on Linux. The launcher uses the Python
 environment you ran it from, so `git pull` updates the app too. The window uses `pywebview` (installed by
-`requirements.txt` on macOS and Windows; on Linux also install GTK WebKit). Logs from the macOS app go to
-`~/Library/Logs/Subnetry.log`.
+`requirements.txt` on macOS and Windows; on Linux also install GTK WebKit). Logs from the desktop app go to
+`~/Library/Logs/Subnetry.log` on macOS and `%LOCALAPPDATA%\Subnetry\Subnetry.log` on Windows (where a startup
+problem also shows an error message).
 
 ### Platform notes
 
