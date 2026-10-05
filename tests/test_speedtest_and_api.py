@@ -91,3 +91,16 @@ def test_port_scan_localhost_finds_listener():
             return port, await netscan.scan_ports("127.0.0.1", ports=[port, 1])
     port, result = asyncio.run(run())
     assert [p["port"] for p in result["open"]] == [port]
+
+
+def test_ui_files_are_revalidated_after_updates():
+    from fastapi.testclient import TestClient
+
+    from subnetry.server import app
+
+    client = TestClient(app)
+    for path in ("/", "/static/app.js", "/static/styles.css"):
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", path
+    etag = client.get("/static/app.js").headers["etag"]
+    assert client.get("/static/app.js", headers={"If-None-Match": etag}).status_code == 304  # still cheap

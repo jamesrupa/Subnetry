@@ -33,6 +33,17 @@ async def block_cross_site(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def revalidate_ui_files(request: Request, call_next):
+    """Make browsers (and the desktop window, which keeps its cache between runs) check for a newer
+    page and scripts on every load, so an update shows up straight away. Unchanged files still come
+    back as a quick 304 Not Modified."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 def sse(events: AsyncIterator[dict]) -> StreamingResponse:
     async def stream():
         try:
