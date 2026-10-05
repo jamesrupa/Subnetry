@@ -59,6 +59,7 @@ def test_run_window_serves_app_and_shuts_down(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "webview", fake)
     assert desktop_app.run_window("127.0.0.1", 18765)
     assert seen["title"] == "Subnetry" and "<title>Subnetry</title>" in seen["page"]
+    assert "?launch=" in seen["url"]  # a fresh address each launch, so no stale cached page
     assert seen["options"]["private_mode"] is False and fake.settings["ALLOW_DOWNLOADS"] is True
 
 

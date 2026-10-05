@@ -158,7 +158,9 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
             webview.settings[key] = value  # pywebview 5+: report exports save normally, links open in your browser
         except (AttributeError, TypeError):
             pass
-    window = webview.create_window("Subnetry", url, width=1400, height=900, min_size=(900, 600),
+    # A new address each launch: the window's web engine (WebKit on macOS) can't reuse a cached
+    # page from before an update.
+    window = webview.create_window("Subnetry", f"{url}?launch={int(time.time())}", width=1400, height=900, min_size=(900, 600),
                                    background_color="#060a12", text_select=True)
     shown = getattr(getattr(window, "events", None), "shown", None)
     fell_back = threading.Event()

@@ -104,3 +104,24 @@ def test_ui_files_are_revalidated_after_updates():
         assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", path
     etag = client.get("/static/app.js").headers["etag"]
     assert client.get("/static/app.js", headers={"If-None-Match": etag}).status_code == 304  # still cheap
+
+
+def test_index_links_versioned_assets(tmp_path, monkeypatch):
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from subnetry import server
+
+    client = TestClient(server.app)
+    html = client.get("/").text
+    links = re.findall(r'"/static/([\w/.-]+\.(?:js|css))(\?v=\w+)?"', html)
+    assert links and all(v for _, v in links), "every script/stylesheet link carries ?v=<hash>"
+    assert client.get(f"/static/{links[0][0]}{links[0][1]}").status_code == 200
+    # Changing a file changes its URL.
+    monkeypatch.setattr(server, "STATIC_DIR", tmp_path)
+    (tmp_path / "index.html").write_text('<script src="/static/app.js"></script>')
+    (tmp_path / "app.js").write_text("one")
+    first = client.get("/").text
+    (tmp_path / "app.js").write_text("two")
+    assert client.get("/").text != first

@@ -7,6 +7,7 @@ browser can show live progress through a plain `EventSource`.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import re
 from collections.abc import AsyncIterator
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
@@ -307,9 +308,24 @@ async def export_report(report_id: str, format: str = Query("html")):
 
 # --- UI ---------------------------------------------------------------------------
 
+_ASSET_LINK = re.compile(r'(src|href)="/static/([^"?]+\.(?:js|css))"')
+
+
+def _versioned(match: re.Match) -> str:
+    """/static/app.js -> /static/app.js?v=<content hash>: a changed file gets a new URL, so no
+    cache (including WebKit's on macOS, which ignored later no-cache headers) can serve an old copy."""
+    path = STATIC_DIR / match[2]
+    try:
+        digest = hashlib.sha1(path.read_bytes()).hexdigest()[:10]
+    except OSError:
+        return match[0]
+    return f'{match[1]}="/static/{match[2]}?v={digest}"'
+
+
 @app.get("/", include_in_schema=False)
 async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(_ASSET_LINK.sub(_versioned, html))
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
