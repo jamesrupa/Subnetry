@@ -121,6 +121,9 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     import logging
     import platform
 
+    warning = protected_location_warning()
+    if warning:
+        raise RuntimeError(warning)
     _log(f"Starting the desktop window: Python {platform.python_version()} ({sys.executable}), "
          f"{platform.platform()}, pywebview {_pywebview_version()}")
     try:
@@ -276,7 +279,28 @@ def remove_legacy_launchers() -> list[str]:
     return removed
 
 
+def protected_location_warning(project_dir: Path | None = None) -> str | None:
+    """Subnetry cloned inside C:\\Windows (an Administrator PowerShell starts in System32): the window
+    engine can't write its files there when the app runs as a normal user, so the window never opens."""
+    if sys.platform != "win32":
+        return None
+    windir = Path(os.environ.get("WINDIR") or os.environ.get("SystemRoot") or r"C:\Windows")
+    folder = (project_dir or PROJECT_DIR).resolve()
+    try:
+        folder.relative_to(windir.resolve())
+    except ValueError:
+        return None
+    return (f"Subnetry is installed inside the Windows system folder ({folder}), probably because it was "
+            "downloaded from an Administrator PowerShell. Windows protects that folder, so the app can't open "
+            "its window there. Open a normal (non-Administrator) PowerShell and set Subnetry up again in your "
+            "user folder: `cd $HOME`, then `git clone https://github.com/jamesrupa/subnetry.git` and the "
+            "other setup steps.")
+
+
 def install_launcher() -> str:
+    warning = protected_location_warning()
+    if warning:
+        raise SystemExit(warning)
     legacy = remove_legacy_launchers()
     note = ("\nRemoved the old launcher(s) from before the rename: " + ", ".join(legacy)) if legacy else ""
     return _install_launcher() + note

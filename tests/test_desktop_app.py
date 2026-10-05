@@ -183,3 +183,16 @@ def test_log_path_per_platform(monkeypatch, tmp_path):
     assert entry.log_path() == tmp_path / "Subnetry" / "Subnetry.log"
     monkeypatch.setattr(sys, "platform", "darwin")
     assert entry.log_path().parts[-3:] == ("Library", "Logs", "Subnetry.log")
+
+
+def test_refuses_to_run_from_the_windows_folder(monkeypatch, tmp_path):
+    windir = tmp_path / "Windows"
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("WINDIR", str(windir))
+    assert "Windows system folder" in desktop_app.protected_location_warning(windir / "System32" / "subnetry")
+    assert desktop_app.protected_location_warning(tmp_path / "Users" / "me" / "subnetry") is None
+    monkeypatch.setattr(desktop_app, "PROJECT_DIR", windir / "System32" / "subnetry")
+    with pytest.raises(SystemExit, match="non-Administrator"):
+        desktop_app.install_launcher()
+    with pytest.raises(RuntimeError, match="Windows system folder"):
+        desktop_app.run_window()
