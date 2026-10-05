@@ -675,3 +675,38 @@ tr.hl td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .dd-help { flex-basis: 100%; }
 #dd-card .table-wrap td .sub { white-space: normal; }
 @media (max-width: 640px) { #dd-key { width: 100%; } .toolbar label:has(#dd-key) { flex-basis: 100%; } }
+
+/* --- Modal dialogs (capture filter guide) ------------------------------------------------- */
+.modal {
+  width: min(860px, calc(100vw - 32px)); max-height: min(86vh, 900px); padding: 0; overflow: hidden;
+  color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .55), 0 0 0 1px var(--glow);
+}
+.modal[open] { display: flex; flex-direction: column; animation: rise .25s cubic-bezier(.2, .7, .2, 1) both; }
+.modal::backdrop { background: rgba(2, 6, 14, .62); backdrop-filter: blur(2px); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px;
+  border-bottom: 1px solid var(--border); }
+.modal-head h2 { margin: 0; }
+.modal-body { padding: 4px 18px 18px; overflow-y: auto; }
+.modal-body > p { color: var(--text-secondary); }
+.modal-body h3 { margin: 18px 0 6px; font-size: 14px; }
+.modal-body code { color: var(--accent); overflow-wrap: anywhere; }
+.modal-search { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); margin: 12px 0 4px; }
+.modal-search input { width: 100%; }
+.filter-group h3 { margin-top: 14px; }
+.filter-example { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; background: var(--surface-2); }
+.filter-example span { color: var(--text-secondary); font-size: 13px; }
+.filter-field { display: flex; align-items: flex-end; gap: 6px; }
+#tr-filter { width: 240px; }
+.filter-hint { margin: -4px 0 10px; padding: 8px 12px; border: 1px solid var(--warning); border-radius: 6px; font-size: 13px;
+  color: var(--text-secondary); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+.filter-hint code { color: var(--accent); }
+@media (max-width: 640px) {
+  .filter-field { flex-basis: 100%; }
+  .filter-field label { flex: 1; }
+  #tr-filter { width: 100%; }
+  .filter-example { grid-template-columns: minmax(0, 1fr) auto; }
+  .filter-example span { grid-column: 1; grid-row: 2; }
+  .filter-example .btn { grid-row: 1 / span 2; grid-column: 2; }
+}

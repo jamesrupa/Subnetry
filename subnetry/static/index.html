@@ -383,11 +383,15 @@
       <form class="toolbar" id="tr-form">
         <label>Interface <select id="tr-iface"></select></label>
         <label>Duration <select id="tr-duration"><option value="30">30 s</option><option value="60" selected>1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option></select></label>
-        <label>Capture filter (optional) <input id="tr-filter" placeholder="e.g. host 192.168.1.20" spellcheck="false"></label>
+        <div class="filter-field">
+          <label>Capture filter (optional) <input id="tr-filter" placeholder="e.g. host 192.168.1.20" spellcheck="false" autocomplete="off"></label>
+          <button class="btn" type="button" id="tr-filter-help" title="Capture filter guide and examples">Filter help</button>
+        </div>
         <label class="check"><input type="checkbox" id="tr-save"> Save .pcapng for Wireshark</label>
         <button class="btn primary" id="tr-start" type="submit">Start capture</button>
         <button class="btn" id="tr-stop" type="button" hidden>Stop</button>
       </form>
+      <div class="filter-hint" id="tr-filter-hint" hidden></div>
       <p class="status" id="tr-status">Pick the interface you use to reach the internet (usually Wi-Fi or Ethernet) and start a capture.</p>
       <details class="explain">
         <summary>What can I see?</summary>
@@ -421,6 +425,27 @@
         <ul class="feed" id="tr-feed"><li class="sub">Nothing captured yet.</li></ul>
       </div>
     </section>
+
+    <dialog class="modal" id="tr-help-dialog" aria-labelledby="tr-help-title">
+      <div class="modal-head">
+        <h2 id="tr-help-title">Capture filter guide</h2>
+        <button class="btn small" type="button" data-close>Close</button>
+      </div>
+      <div class="modal-body">
+        <p>A <b>capture filter</b> decides which packets are recorded at all, which keeps captures small and focused.
+          Leave it empty to capture everything. It uses the <i>BPF</i> syntax of tcpdump and Wireshark's capture options:
+          words like <code>host</code>, <code>port</code> and <code>net</code>, joined with <code>and</code>, <code>or</code> and <code>not</code>.</p>
+        <p class="sub">Not the same as Wireshark's display filters (<code>ip.addr == …</code>): those only work after capturing. See the
+          translation table at the bottom.</p>
+        <label class="modal-search">Find an example <input id="tr-help-search" placeholder="dns, router, youtube, ssh…" spellcheck="false" autocomplete="off"></label>
+        <div id="tr-help-examples"></div>
+        <h3>Syntax cheat sheet</h3>
+        <div class="table-wrap flat"><table><thead><tr><th>Write</th><th>Matches</th><th>Example</th></tr></thead><tbody id="tr-help-syntax"></tbody></table></div>
+        <h3>Wireshark display filter → capture filter</h3>
+        <div class="table-wrap flat"><table><thead><tr><th>Display filter (won't work here)</th><th>Capture filter (use this)</th></tr></thead><tbody id="tr-help-translate"></tbody></table></div>
+        <p class="sub top-gap-sm">Tip: a filter only removes packets, so if a capture comes back empty, try a broader filter (or none) first.</p>
+      </div>
+    </dialog>
 
     <!-- Subnet calculator ---------------------------------------------------------->
     <section id="tab-subnet" class="panel" role="tabpanel" hidden>

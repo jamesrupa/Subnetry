@@ -374,3 +374,27 @@ def test_safe_concurrency_respects_low_file_limits(monkeypatch):
     assert system.safe_concurrency(11, 64) == 16  # (256 - 64) // 12
     monkeypatch.setattr(system, "raise_open_file_limit", lambda target=4096: 4096)
     assert system.safe_concurrency(11, 64) == 64
+
+
+@pytest.mark.parametrize("stderr,expected,not_expected", [
+    (["tshark: Invalid capture filter \"ip.addr == 1.2.3.4\" for interface 'Wi-Fi'.",
+      "That string looks like a valid display filter; however, it isn't a valid capture filter (can't parse filter expression: syntax error).",
+      "Note that display filters and capture filters don't have the same syntax"],
+     "display-filter syntax", "wireshark group"),
+    (["tshark: You don't have permission to capture on that device"], "wireshark", "capture filter"),
+])
+def test_capture_errors_are_explained(monkeypatch, stderr, expected, not_expected):
+    async def fake_stream(args):
+        for line in stderr:
+            yield "err", line
+        yield "exit", 1
+
+    monkeypatch.setattr(traffic, "find_tshark", lambda: "/usr/bin/tshark")
+    monkeypatch.setattr(traffic, "stream_cmd", fake_stream)
+    monkeypatch.setattr(traffic.platform, "system", lambda: "Linux")
+
+    async def run():
+        return [ev async for ev in traffic.capture("eth0", 5, "ip.addr == 1.2.3.4" if "display" in expected else "")]
+
+    err = next(e for e in asyncio.run(run()) if e["type"] == "error")["message"]
+    assert expected.lower() in err.lower() and not_expected.lower() not in err.lower()

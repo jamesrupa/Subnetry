@@ -387,7 +387,12 @@ async def capture(
         elif kind == "exit":
             if line not in (0, None):
                 msg = " ".join(errors[-5:]) or f"tshark exited with code {line}."
-                if "permission" in msg.lower() or "don't have" in msg.lower():
+                everything = " ".join(errors).lower()
+                if capture_filter.strip() and ("invalid capture filter" in everything or "parse filter" in everything):
+                    msg = (f"\"{capture_filter.strip()}\" isn't a valid capture filter"
+                           + (" (it's Wireshark display-filter syntax)" if "display filter" in everything else "")
+                           + ". Press \"Filter help\" for examples, or leave the filter empty to capture everything.")
+                elif "permission" in msg.lower() or "don't have permission" in msg.lower():
                     msg += " " + PERMISSION_HELP.get(platform.system(), "")
                 yield {"type": "error", "message": msg}
                 return
