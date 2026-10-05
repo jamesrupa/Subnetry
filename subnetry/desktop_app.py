@@ -116,6 +116,11 @@ def _serve_in_browser(url: str, server_thread: threading.Thread, open_browser: b
         pass
 
 
+def window_icon(platform: str | None = None) -> Path:
+    """Windows' .NET Icon class only accepts .ico files (a PNG crashes the whole window)."""
+    return ASSETS / ("Subnetry.ico" if (platform or sys.platform) == "win32" else "Subnetry.png")
+
+
 def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     """Run the server in the background and show it in a native window. False if pywebview is missing."""
     import logging
@@ -177,7 +182,7 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     # Keep browser storage between runs (theme choice etc.); pywebview defaults to a private session.
     storage = Path.home() / (".subnetry" if sys.platform != "darwin" else "Library/Application Support/Subnetry") / "webview"
     storage.mkdir(parents=True, exist_ok=True)
-    options = {"private_mode": False, "storage_path": str(storage), "icon": str(ASSETS / "Subnetry.png")}
+    options = {"private_mode": False, "storage_path": str(storage), "icon": str(window_icon())}
     _log("Opening the window…")
     while True:  # older pywebview versions lack some options: drop them one by one
         try:

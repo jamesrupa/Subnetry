@@ -196,3 +196,17 @@ def test_refuses_to_run_from_the_windows_folder(monkeypatch, tmp_path):
         desktop_app.install_launcher()
     with pytest.raises(RuntimeError, match="Windows system folder"):
         desktop_app.run_window()
+
+
+def test_window_icon_is_ico_on_windows():
+    import struct
+
+    ico = desktop_app.window_icon("win32")
+    assert ico.suffix == ".ico" and desktop_app.window_icon("darwin").suffix == ".png"
+    data = ico.read_bytes()
+    reserved, kind, count = struct.unpack("<HHH", data[:6])
+    assert (reserved, kind) == (0, 1) and count >= 4
+    for i in range(count):  # every frame a classic BMP (BITMAPINFOHEADER), not an embedded PNG
+        w, h, _, _, planes, bits, size, offset = struct.unpack("<BBBBHHII", data[6 + 16 * i:22 + 16 * i])
+        assert bits == 32 and offset + size <= len(data)
+        assert struct.unpack("<I", data[offset:offset + 4])[0] == 40, f"frame {w or 256}px is not a BMP"
