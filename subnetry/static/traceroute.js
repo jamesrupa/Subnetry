@@ -108,6 +108,18 @@ function tcStart(target) {
   });
 }
 
+/** Show a finished trace (e.g. from the Full Scan) in this tab. */
+function tcShowResult(done) {
+  if (tcRun) return;  // don't overwrite a trace that's running here
+  tcHops = new Map(done.hops.map((h) => [h.hop, h]));
+  tcInfo = new Map(Object.entries(done.info || {}));
+  $("#tc-target").value = done.target;
+  tcRender();
+  tcRenderPath(done.path || []);
+  setStatus($("#tc-status"), `From the Full Scan: ${done.hops.length} hop${done.hops.length === 1 ? "" : "s"} to ${esc(done.target)} in ${done.seconds}s.`);
+  $("#tc-findings").innerHTML = done.findings?.length ? `<h2>What we noticed</h2>${done.findings.map(recCard).join("")}` : "";
+}
+
 async function loadTraceroute() {
   if (tcStatusLoaded) return;
   tcStatusLoaded = true;

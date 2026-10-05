@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from subnetry import server
-from subnetry.tools import advisor, diagnose, report, wifiscan
+from subnetry.tools import advisor, diagnose, report, traceroute, wifiscan
 
 
 def titles(recs, severity=None):
@@ -153,6 +153,20 @@ def stub_tools(monkeypatch):
     async def ookla_status():
         return {"installed": False}
 
+    async def trace(target, max_hops=30, resolve=True):
+        hops = [traceroute.summarize_hop({"hop": 1, "ips": ["192.168.1.1"], "rtts": [1.0, 1.2, 1.1], "notes": []}),
+                traceroute.summarize_hop({"hop": 2, "ips": ["142.250.80.46"], "rtts": [12.0, 11.0, 13.0], "notes": []})]
+        info = {"192.168.1.1": {"ip": "192.168.1.1", "scope": "local"},
+                "142.250.80.46": {"ip": "142.250.80.46", "scope": "public", "asn": {"asn": "15169", "org": "Google LLC"}}}
+        yield {"type": "start", "target": target, "max_hops": max_hops}
+        for h in hops:
+            yield {"type": "hop", "hop": h}
+        yield {"type": "done", "target": target, "target_ip": "142.250.80.46", "hops": hops, "info": info,
+               "path": traceroute.path_summary(hops, info),
+               "findings": traceroute.findings(target, "142.250.80.46", hops, info), "seconds": 1.0}
+
+    monkeypatch.setattr(diagnose.traceroute, "find_command", lambda: "/usr/sbin/traceroute")
+    monkeypatch.setattr(diagnose.traceroute, "run", trace)
     monkeypatch.setattr(diagnose.ookla, "status", ookla_status)
     monkeypatch.setattr(diagnose.nmapscan, "find_nmap", lambda: None)
     monkeypatch.setattr(diagnose.netinfo, "overview", overview)
@@ -180,9 +194,9 @@ def test_quick_scan_runs_speed_and_wifi(stub_tools):
 
 def test_full_scan_combines_everything(stub_tools):
     events = asyncio.run(run("full"))
-    assert [s["id"] for s in events[0]["steps"]] == ["speed", "devices", "ports", "wifi"]
+    assert [s["id"] for s in events[0]["steps"]] == ["speed", "trace", "devices", "ports", "wifi"]
     statuses = [(e["step"], e["status"]) for e in events if e["type"] == "step" and e["status"] != "running"]
-    assert statuses == [("speed", "done"), ("devices", "done"), ("ports", "done"), ("wifi", "done")]
+    assert statuses == [("speed", "done"), ("trace", "done"), ("devices", "done"), ("ports", "done"), ("wifi", "done")]
     rep = events[-1]["report"]
     assert [h["ip"] for h in rep["network"]["hosts"]] == ["192.168.1.1", "192.168.1.9"]
     assert rep["network"]["hosts"][1]["ports"]["open"][0]["port"] == 23
@@ -191,6 +205,26 @@ def test_full_scan_combines_everything(stub_tools):
     assert rep["score"]["value"] < 100
     top = rep["score"]["improvements"][0]
     assert "Telnet" in top["title"] and top["points"] > 0 and top["action"]
+
+
+def test_full_scan_traces_to_google(stub_tools):
+    rep = asyncio.run(run("full"))[-1]["report"]
+    assert rep["trace"]["target"] == "google.com" and len(rep["trace"]["hops"]) == 2
+    assert [p["name"] for p in rep["trace"]["path"]] == ["your network", "Google LLC"]
+    titles_ = titles(rep["recommendations"])
+    assert "Reached google.com in 2 hops" in titles_ and "Your router answers quickly (1.1 ms)" in titles_
+    html = report.render(rep, "html")
+    assert "<h2>Traceroute to google.com</h2>" in html and "Your network → Google LLC" in html
+    assert "trace" not in [s["id"] for s in asyncio.run(run("quick"))[0]["steps"]]
+
+
+def test_full_scan_without_traceroute(stub_tools, monkeypatch):
+    monkeypatch.setattr(diagnose.traceroute, "find_command", lambda: None)
+    events = asyncio.run(run("full"))
+    rep = events[-1]["report"]
+    assert "isn't available" in rep["trace"]["error"]
+    assert "Traceroute unavailable" in titles(rep["recommendations"], "info")
+    assert "<h2>Traceroute</h2><p class='muted'>traceroute isn&#x27;t available" in report.render(rep, "html")
 
 
 def test_full_scan_uses_top_1000_ports(stub_tools, monkeypatch):

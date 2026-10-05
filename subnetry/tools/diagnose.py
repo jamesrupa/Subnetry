@@ -1,7 +1,7 @@
 """Quick and Full health checks: run several tools in sequence and build one report.
 
   quick -> speed test, Wi-Fi scan
-  full  -> speed test, network scan (saved to a file), top-1000 port scan, Wi-Fi scan
+  full  -> speed test, traceroute, network scan (saved to a file), top-1000 port scan, Wi-Fi scan
 
 The speed test uses Speedtest.net (Ookla's CLI) and only falls back to Cloudflare when
 the CLI isn't installed or fails. The port scan uses Nmap when it's installed, otherwise
@@ -21,12 +21,13 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
 from ..system import raise_open_file_limit
-from . import advisor, netinfo, netscan, nmapscan, ookla, speedtest, topports, wifiscan
+from . import advisor, netinfo, netscan, nmapscan, ookla, speedtest, topports, traceroute, wifiscan
 
 MODES = {
     "quick": [("speed", "Speed test"), ("wifi", "Wi-Fi scan")],
     "full": [
         ("speed", "Speed test"),
+        ("trace", "Traceroute to the internet"),
         ("devices", "Network scan"),
         ("ports", "Port scan (top 1000 ports)"),
         ("wifi", "Wi-Fi scan"),
@@ -145,7 +146,23 @@ async def _ports_builtin(hosts: list[dict]) -> AsyncIterator[dict]:
         yield {"type": "ports", "ip": host["ip"], "ports": host["ports"], "done": done, "total": len(hosts)}
 
 
-STEPS = {"speed": _speed, "wifi": _wifi, "devices": _devices, "ports": _ports}
+TRACE_TARGET = "google.com"  # the route from this network out to a major website
+
+
+async def _trace(report: dict) -> AsyncIterator[dict]:
+    """The path from this network to the internet, and where delay or loss starts."""
+    if not traceroute.find_command():
+        report["trace"] = {"error": "traceroute isn't available on this computer.", "target": TRACE_TARGET}
+        yield {"type": "error", "message": report["trace"]["error"]}
+        return
+    async for ev in traceroute.run(TRACE_TARGET, max_hops=20):
+        if ev["type"] == "done":
+            report["trace"] = {k: ev[k] for k in ("target", "target_ip", "hops", "path", "findings", "seconds")} | {"info": ev["info"]}
+        yield ev
+    report.setdefault("trace", {"error": "The traceroute returned no result.", "target": TRACE_TARGET})
+
+
+STEPS = {"speed": _speed, "trace": _trace, "wifi": _wifi, "devices": _devices, "ports": _ports}
 
 
 def new_report(mode: str) -> dict:

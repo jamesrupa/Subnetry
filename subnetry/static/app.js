@@ -845,7 +845,7 @@ $("#wifi-start").addEventListener("click", async () => {
 // --- Health check -----------------------------------------------------------------------
 
 const STEP_ICON = { pending: "○", running: "●", done: "✔", error: "✖" };
-const DETAIL_TAB = { speed: ["speed", "Speed Test"], devices: ["scan", "Network Scanner"], wifi: ["wifi", "Wi-Fi Scanner"] };
+const DETAIL_TAB = { speed: ["speed", "Speed Test"], trace: ["trace", "Traceroute"], devices: ["scan", "Network Scanner"], wifi: ["wifi", "Wi-Fi Scanner"] };
 let hcReport = null;
 let hcFilter = "all";
 
@@ -961,6 +961,18 @@ function startDiagnosis(mode) {
       } else if (ev.step === "wifi") {
         if (e.wifi.error) update("wifi", { detail: e.wifi.error.split("\n")[0] });
         else { renderWifi(e.wifi); update("wifi", { detail: `${e.wifi.networks.length} access points found` }); }
+      } else if (ev.step === "trace") {
+        if (e.type === "start") update("trace", { detail: `Tracing the route to ${e.target}…` });
+        if (e.type === "hop") {
+          const h = e.hop;
+          update("trace", { detail: `Hop ${h.hop}: ${h.ips[0] || "no reply"}${h.avg_ms != null ? ` · ${h.avg_ms.toFixed(h.avg_ms < 10 ? 1 : 0)} ms` : ""}` });
+        }
+        if (e.type === "done") {
+          const last = e.hops[e.hops.length - 1];
+          const reached = e.target_ip && e.hops.some((h) => h.ips.includes(e.target_ip));
+          update("trace", { detail: `${e.hops.length} hops to ${e.target}${reached && last?.avg_ms != null ? ` · ${Math.round(last.avg_ms)} ms` : reached ? "" : " (no reply from the destination)"}` });
+          tcShowResult(e);
+        }
       } else if (ev.step === "devices") {
         if (e.type === "start") update("devices", { detail: `Scanning ${e.network}…` });
         if (e.type === "host") { hosts.set(e.host.ip, { ...hosts.get(e.host.ip), ...e.host }); renderHosts(); }

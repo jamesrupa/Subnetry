@@ -8,7 +8,7 @@ for nearby Wi-Fi networks. The dashboard shows the results live.
 | Tool | What it does |
 |---|---|
 | **Dashboard** | The home screen: live connection status and latency (router, internet, DNS), a live Wi-Fi signal dial, and your latest speed test, health score, device count and top recommendations, with one-click quick actions. |
-| **Health Check** | One-click **Quick scan** (speed test and Wi-Fi scan) or **Full scan** (speed test, network scan saved to a file, a top-1000-port scan of every device, and Wi-Fi scan). Ends with a health score, a ranked "how to improve your score" plan and a prioritized list of recommended changes. Results export as HTML/JSON/CSV. |
+| **Health Check** | One-click **Quick scan** (speed test and Wi-Fi scan) or **Full scan** (speed test, traceroute to google.com, network scan saved to a file, a top-1000-port scan of every device, and Wi-Fi scan). Ends with a health score, a ranked "how to improve your score" plan and a prioritized list of recommended changes. Results export as HTML/JSON/CSV. |
 | **Overview** | Hostname, local IP, default gateway, DNS servers, public IP and every network interface. |
 | **Speed Test** | Ping, jitter, download, upload and packet loss using the official **Speedtest.net (Ookla) CLI**, with a server picker and a shareable result link. Falls back to Cloudflare's speed-test endpoints when the CLI isn't installed. Live throughput chart. |
 | **Network Scanner** | Sweeps your LAN for devices using ICMP ping, TCP probes and the ARP table. Shows IP, hostname, MAC with its manufacturer (and flags private/randomized MACs), response time and a device-type guess (printer, NAS, camera, TV…). Devices with a web interface (router, printer, NAS) get a clickable IP that opens it in your browser. Can also run a common-ports scan on each device. |
@@ -98,9 +98,10 @@ mode, or a capture on the router.
 |---|---|---|
 | Speed test (download, upload, ping, jitter, packet loss) | ✔ | ✔ |
 | Wi-Fi scan: signal, security, band and channel congestion | ✔ | ✔ |
+| Traceroute to google.com: the path out to the internet, where delay or loss starts | | ✔ |
 | Network scan of every device, saved to a file | | ✔ |
 | Port scan: the 1000 most common TCP ports on each device | | ✔ |
-| Typical time | 30–40 s | 2–5 min |
+| Typical time | 30–40 s | 3–6 min |
 
 - **Speed test:** Speedtest.net through Ookla's official CLI. Cloudflare's test is used only when the CLI isn't
   installed (the results say so and explain how to install it) or when a Speedtest.net run fails.

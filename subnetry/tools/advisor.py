@@ -358,9 +358,19 @@ def router_rules(router: dict) -> list[dict]:
 
 # --- overall ----------------------------------------------------------------------
 
+def trace_rules(trace: dict | None) -> list[dict]:
+    """The traceroute's findings (where delay or loss starts, a slow first hop, …)."""
+    if not trace:
+        return []
+    if trace.get("error"):
+        return [rec("info", "Traceroute", "Traceroute unavailable", trace["error"])]
+    return [dict(f) for f in trace.get("findings", [])]
+
+
 def recommend(report: dict) -> list[dict]:
     recs = (
         speed_rules(report.get("speed"))
+        + trace_rules(report.get("trace"))
         + wifi_rules(report.get("wifi"))
         + network_rules(report.get("network"), report.get("system"))
     )
