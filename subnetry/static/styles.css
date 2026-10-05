@@ -710,3 +710,27 @@ tr.hl td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .filter-example span { grid-column: 1; grid-row: 2; }
   .filter-example .btn { grid-row: 1 / span 2; grid-column: 2; }
 }
+
+/* --- Traceroute ------------------------------------------------------------------------------ */
+#tc-target { width: 240px; }
+.tc-addr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.tc-addr + .tc-addr { margin-top: 4px; }
+.tc-probes { display: flex; gap: 4px; }
+.tc-probe { font: 12px var(--mono); min-width: 38px; text-align: center; padding: 2px 6px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--surface-2); }
+.tc-probe.good { color: var(--good); }
+.tc-probe.warning { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+.tc-probe.critical { color: var(--critical); border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
+.tc-probe.none { color: var(--text-muted); }
+.trace-path { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tc-node { display: flex; flex-direction: column; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); max-width: 260px; }
+.tc-node b { overflow-wrap: anywhere; }
+.tc-node.local { border-color: var(--accent); }
+.tc-node.cgnat { border-color: var(--border-strong); }
+.tc-arrow { color: var(--accent); font-weight: 700; }
+@media (max-width: 640px) {
+  #tc-target { width: 100%; }
+  .toolbar label:has(#tc-target) { flex-basis: 100%; }
+  .tc-node { max-width: 100%; }
+}

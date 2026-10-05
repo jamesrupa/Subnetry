@@ -12,6 +12,7 @@ for nearby Wi-Fi networks. The dashboard shows the results live.
 | **Overview** | Hostname, local IP, default gateway, DNS servers, public IP and every network interface. |
 | **Speed Test** | Ping, jitter, download, upload and packet loss using the official **Speedtest.net (Ookla) CLI**, with a server picker and a shareable result link. Falls back to Cloudflare's speed-test endpoints when the CLI isn't installed. Live throughput chart. |
 | **Network Scanner** | Sweeps your LAN for devices using ICMP ping, TCP probes and the ARP table. Shows IP, hostname, MAC with its manufacturer (and flags private/randomized MACs), response time and a device-type guess (printer, NAS, camera, TV…). Devices with a web interface (router, printer, NAS) get a clickable IP that opens it in your browser. Can also run a common-ports scan on each device. |
+| **Traceroute** | The route to any website or IP, hop by hop and live: each router's name, network owner (ASN) and country, three round-trip times and loss, a latency-per-hop chart and a route summary (Your network → ISP → … → destination). Explains where delay or loss starts, whether it's your Wi-Fi/router, your ISP or just distance, and when silent hops can be ignored. Uses the system's `traceroute` (macOS/Linux) or `tracert` (Windows). |
 | **Public IP** | Your public IPv4/IPv6 address, ISP, ASN, approximate location, time zone and reverse DNS. Can also look up any other public IP. |
 | **Port Scanner (Nmap)** | Runs [Nmap](https://nmap.org) with ready-made profiles (host discovery, top 100, top 1000 + versions, all ports) and optional OS detection and default scripts. Works on LAN ranges, **public IPs and hostnames** (public targets need you to confirm you own them or have permission; up to a /24). Shows live progress, per-device ports, software versions, MAC vendors, OS guesses and web-interface links, with the same security recommendations as the Health Check. |
 | **Wi-Fi Monitor** | Live signal graph colored by access point, with a signal dial beside it. Catches roaming between APs and mesh nodes, disconnects, and "sticky" connections that cling to a weak AP while a much stronger one is nearby. Mark locations as you walk around to build a weak-spot survey, and export samples as CSV. |
@@ -146,6 +147,7 @@ subnetry/
     macos_helper.py  # builds/drives the "Subnetry Wi-Fi Helper" app (Swift source in subnetry/macos_helper/)
     dashboard.py     # remembered "last results" + live latency/Wi-Fi stream for the home screen
     traffic.py       # tshark capture + plain-English traffic analysis
+    traceroute.py    # traceroute/tracert runner, parsers, hop names/ASNs (Team Cymru DNS) and findings
     subnetcalc.py    # subnet / CIDR maths (ipaddress), splitting and summarizing
     macvendor.py     # OUI vendor database (Nmap list or IEEE registry download)
     portref.py       # common-port reference data

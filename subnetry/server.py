@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .tools import dashboard, diagnose, dnsdumpster, dnsinfo, ipinfo, macos, macvendor, portref, subnetcalc, netinfo, netscan, nmapscan, ookla, report, speedtest, traffic, wifimonitor, wifiscan
+from .tools import dashboard, diagnose, dnsdumpster, dnsinfo, ipinfo, macos, macvendor, portref, subnetcalc, netinfo, netscan, nmapscan, ookla, report, speedtest, traceroute, traffic, wifimonitor, wifiscan
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -258,6 +258,21 @@ async def nmap_scan(target: str, profile: str = "quick", os_detect: bool = False
         async for ev in nmapscan.run_scan(target, profile, os_detect, scripts, gateway, authorized):
             yield ev
     return sse(run())
+
+
+@app.get("/api/traceroute/status")
+async def traceroute_status():
+    import platform
+
+    return {"installed": bool(traceroute.find_command()),
+            "install_help": traceroute.INSTALL_HELP.get(platform.system(), "")}
+
+
+@app.get("/api/traceroute")
+async def run_traceroute(target: str, max_hops: int = Query(traceroute.DEFAULT_HOPS, ge=1, le=traceroute.MAX_HOPS),
+                         resolve: bool = True):
+    # An invalid target is reported as an error event: EventSource can't read an HTTP 400's message.
+    return sse(traceroute.run(target, max_hops, resolve))
 
 
 @app.get("/api/traffic/status")

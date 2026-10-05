@@ -44,6 +44,7 @@
       <button role="tab" data-tab="ip">Public IP</button>
       <button role="tab" data-tab="speed">Speed Test</button>
       <button role="tab" data-tab="scan">Network Scanner</button>
+      <button role="tab" data-tab="trace">Traceroute</button>
       <button role="tab" data-tab="nmap">Port Scanner (Nmap)</button>
       <div class="nav-group">Wi-Fi</div>
       <button role="tab" data-tab="wifi">Wi-Fi Scanner</button>
@@ -371,6 +372,52 @@
       </div>
     </section>
 
+    <!-- Traceroute ------------------------------------------------------------------------>
+    <section id="tab-trace" class="panel" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Traceroute</h1>
+          <p class="muted">See every router your traffic passes through on the way to a website or server, and where delay or loss begins.</p>
+        </div>
+      </div>
+      <div class="card notice" id="tc-missing" hidden></div>
+      <form class="toolbar" id="tc-form">
+        <label>Destination <input id="tc-target" value="google.com" placeholder="google.com or 1.1.1.1" spellcheck="false" autocomplete="off"></label>
+        <label>Max hops <select id="tc-hops"><option value="15">15</option><option value="30" selected>30</option><option value="64">64</option></select></label>
+        <label class="check"><input type="checkbox" id="tc-resolve" checked> Look up names &amp; networks</label>
+        <button class="btn primary" id="tc-start" type="submit">Start trace</button>
+        <button class="btn" id="tc-stop" type="button" hidden>Stop</button>
+        <span class="chips" id="tc-examples">
+          <button type="button" class="chip" data-target="google.com">google.com</button>
+          <button type="button" class="chip" data-target="1.1.1.1">1.1.1.1</button>
+          <button type="button" class="chip" data-target="8.8.8.8">8.8.8.8</button>
+          <button type="button" class="chip" data-target="amazon.com">amazon.com</button>
+        </span>
+      </form>
+      <div class="status-row"><span id="tc-radar"></span><p class="status" id="tc-status">Enter a website or IP address and press <b>Start trace</b>. It usually takes 10–60 seconds.</p></div>
+      <div class="card" id="tc-path-card" hidden>
+        <div class="card-head"><h2>Route</h2><span class="sub" id="tc-path-note"></span></div>
+        <div class="trace-path" id="tc-path"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Latency per hop</h2><span class="sub">Average round trip in ms</span></div>
+        <div class="chart" id="tc-chart"><p class="sub">Hops appear here as the trace runs.</p></div>
+      </div>
+      <div class="table-wrap top-gap"><table>
+        <thead><tr><th class="num">Hop</th><th>Address</th><th>Network</th><th>Round trips</th><th class="num">Avg</th><th class="num">Loss</th></tr></thead>
+        <tbody id="tc-rows"><tr><td colspan="6" class="empty">No trace yet.</td></tr></tbody>
+      </table></div>
+      <div id="tc-findings" class="top-gap"></div>
+      <details class="explain">
+        <summary>How does traceroute work?</summary>
+        <p>Every packet carries a "time to live" (TTL) counter that each router lowers by one; a router that brings it to zero
+          throws the packet away and sends back a short error message. Traceroute sends probes with a TTL of 1, then 2, then 3…
+          so each router along the path reveals itself in turn, and the time for its reply shows how far away it is.
+          Three probes are sent per hop. A <b>*</b> means no reply: many routers simply don't answer these probes while still
+          passing your traffic on normally.</p>
+      </details>
+    </section>
+
     <!-- Traffic analyzer --------------------------------------------------------------->
     <section id="tab-traffic" class="panel" role="tabpanel" hidden>
       <div class="panel-head">
@@ -597,6 +644,7 @@
   <script src="/static/ipinfo.js"></script>
   <script src="/static/nmap.js"></script>
   <script src="/static/monitor.js"></script>
+  <script src="/static/traceroute.js"></script>
   <script src="/static/traffic.js"></script>
   <script src="/static/dashboard.js"></script>
   <script src="/static/toolkit.js"></script>
