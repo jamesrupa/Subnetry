@@ -78,15 +78,60 @@ def _brand_macos_process() -> None:
         pass
 
 
+WINDOW_TIMEOUT = 20  # seconds to wait for the window before falling back to the browser
+
+
+def _log(message: str) -> None:
+    print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
+
+
+def _pywebview_version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("pywebview")
+    except Exception:
+        return "?"
+
+
+def _serve_in_browser(url: str, server_thread: threading.Thread, open_browser: bool) -> None:
+    """The window didn't work: keep serving Subnetry for the default browser until the user stops it."""
+    if open_browser:
+        import webbrowser
+
+        webbrowser.open(url)
+        _log(f"Opened {url} in your browser instead.")
+    if sys.platform == "win32" and (sys.stdout is None or not sys.stdout.isatty()):
+        from .__main__ import log_path, show_error
+
+        # No console to press Ctrl+C in: the message box keeps Subnetry running until it's dismissed.
+        show_error(f"The Subnetry window couldn't open, so Subnetry is running in your web browser instead "
+                   f"({url}).\n\nClick OK to stop Subnetry.\n\nDetails are in {log_path()}")
+        return
+    print("Press Ctrl+C to stop Subnetry.", flush=True)
+    try:
+        while server_thread.is_alive():
+            server_thread.join(1)
+    except KeyboardInterrupt:
+        pass
+
+
 def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     """Run the server in the background and show it in a native window. False if pywebview is missing."""
+    import logging
+    import platform
+
+    _log(f"Starting the desktop window: Python {platform.python_version()} ({sys.executable}), "
+         f"{platform.platform()}, pywebview {_pywebview_version()}")
     try:
         import webview  # type: ignore[import-not-found]
-    except ImportError:
+    except ImportError as exc:
+        _log(f"pywebview isn't available: {exc}")
         return False
     import uvicorn
 
     port = pick_port(host, port)
+    url = f"http://{host}:{port}/"
     config = uvicorn.Config("subnetry.server:app", host=host, port=port, log_level="warning")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, name="subnetry-server", daemon=True)
@@ -94,20 +139,43 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
     if not wait_for_server(host, port):
         server.should_exit = True
         raise RuntimeError(f"Subnetry's server didn't start on port {port}; see the messages above.")
+    _log(f"Server ready at {url}")
 
     if sys.platform == "darwin":
         _brand_macos_process()
+    if sys.stderr is None or not sys.stderr.isatty():
+        logging.getLogger("pywebview").setLevel(logging.DEBUG)  # which renderer it picked, and why, goes to the log
     for key, value in (("ALLOW_DOWNLOADS", True), ("OPEN_EXTERNAL_LINKS_IN_BROWSER", True)):
         try:
             webview.settings[key] = value  # pywebview 5+: report exports save normally, links open in your browser
         except (AttributeError, TypeError):
             pass
-    webview.create_window("Subnetry", f"http://{host}:{port}/", width=1400, height=900, min_size=(900, 600),
-                          background_color="#060a12", text_select=True)
+    window = webview.create_window("Subnetry", url, width=1400, height=900, min_size=(900, 600),
+                                   background_color="#060a12", text_select=True)
+    shown = getattr(getattr(window, "events", None), "shown", None)
+    fell_back = threading.Event()
+
+    def watchdog() -> None:
+        if shown is not None and not shown.wait(WINDOW_TIMEOUT):
+            fell_back.set()
+            _log(f"The window still hasn't appeared after {WINDOW_TIMEOUT} s.")
+            if sys.platform == "win32" and (sys.stdout is None or not sys.stdout.isatty()):
+                _serve_in_browser(url, thread, open_browser=True)  # returns when the message box is dismissed
+                _log("Stopped from the message box.")
+                os._exit(0)  # the window loop is stuck, so end the whole process
+            import webbrowser
+
+            webbrowser.open(url)
+            _log(f"Opened {url} in your browser instead.")
+        elif shown is not None:
+            _log("Window shown.")
+
+    threading.Thread(target=watchdog, name="subnetry-window-watchdog", daemon=True).start()
     # Keep browser storage between runs (theme choice etc.); pywebview defaults to a private session.
     storage = Path.home() / (".subnetry" if sys.platform != "darwin" else "Library/Application Support/Subnetry") / "webview"
     storage.mkdir(parents=True, exist_ok=True)
     options = {"private_mode": False, "storage_path": str(storage), "icon": str(ASSETS / "Subnetry.png")}
+    _log("Opening the window…")
     while True:  # older pywebview versions lack some options: drop them one by one
         try:
             webview.start(**options)
@@ -117,6 +185,14 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
             if bad is None:
                 raise
             options.pop(bad)
+        except Exception as exc:  # e.g. no WebView2 / pythonnet on Windows, no GTK on Linux
+            _log(f"The window couldn't start: {type(exc).__name__}: {exc}")
+            break
+    if shown is not None and not shown.is_set():
+        _log("The window never appeared.")
+        _serve_in_browser(url, thread, open_browser=not fell_back.is_set())
+    else:
+        _log("Window closed.")
     server.should_exit = True
     thread.join(timeout=5)
     return True

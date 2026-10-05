@@ -62,6 +62,64 @@ def test_run_window_serves_app_and_shuts_down(monkeypatch, tmp_path):
     assert seen["options"]["private_mode"] is False and fake.settings["ALLOW_DOWNLOADS"] is True
 
 
+def _fake_webview(monkeypatch, start):
+    """A pywebview stand-in whose window has a real `shown` event."""
+    import threading
+
+    fake = types.ModuleType("webview")
+    fake.settings = {}
+    window = types.SimpleNamespace(events=types.SimpleNamespace(shown=threading.Event()))
+    fake.create_window = lambda title, url, **kw: window
+    fake.start = lambda **options: start(window)
+    monkeypatch.setitem(sys.modules, "webview", fake)
+    return window
+
+
+def test_run_window_shown_normally(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    fallback = []
+    monkeypatch.setattr(desktop_app, "_serve_in_browser", lambda *a, **k: fallback.append(k))
+    _fake_webview(monkeypatch, lambda w: w.events.shown.set())
+    assert desktop_app.run_window("127.0.0.1", 18766)
+    out = capsys.readouterr().out
+    assert not fallback and "Server ready at" in out and "Window closed." in out and "pywebview" in out
+
+
+@pytest.mark.parametrize("problem", ["returns", "raises"])
+def test_run_window_falls_back_to_browser(monkeypatch, tmp_path, capsys, problem):
+    """If the window never appears (e.g. no WebView2 on Windows), Subnetry opens in the browser instead."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    fallback = []
+    monkeypatch.setattr(desktop_app, "_serve_in_browser", lambda url, thread, open_browser: fallback.append((url, open_browser)))
+
+    def start(window):
+        if problem == "raises":
+            raise RuntimeError("WebView2 runtime not found")
+
+    _fake_webview(monkeypatch, start)
+    assert desktop_app.run_window("127.0.0.1", 18767)
+    assert fallback == [("http://127.0.0.1:18767/", True)]
+    out = capsys.readouterr().out
+    assert "The window never appeared." in out
+    if problem == "raises":
+        assert "WebView2 runtime not found" in out
+
+
+def test_run_window_watchdog_opens_browser_when_stuck(monkeypatch, tmp_path, capsys):
+    import time as _time
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(desktop_app, "WINDOW_TIMEOUT", 0.3)
+    opened, fallback = [], []
+    monkeypatch.setattr("webbrowser.open", opened.append)
+    monkeypatch.setattr(desktop_app, "_serve_in_browser", lambda url, thread, open_browser: fallback.append(open_browser))
+    _fake_webview(monkeypatch, lambda w: _time.sleep(1))  # a window loop that hangs for a while
+    assert desktop_app.run_window("127.0.0.1", 18768)
+    assert opened == ["http://127.0.0.1:18768/"]
+    assert fallback == [False]  # browser already open: don't open a second tab
+    assert "hasn't appeared after" in capsys.readouterr().out
+
+
 def test_run_window_without_pywebview(monkeypatch):
     monkeypatch.setitem(sys.modules, "webview", None)  # import fails
     assert desktop_app.run_window() is False

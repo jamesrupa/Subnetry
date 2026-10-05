@@ -34,6 +34,12 @@ def attach_log_if_windowless() -> Path | None:
     except OSError:
         log = open(os.devnull, "w", encoding="utf-8")
     log.write(f"\n--- Subnetry started {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+    try:
+        import faulthandler
+
+        faulthandler.enable(log)  # a crash inside native code (e.g. the window engine) still leaves a trace
+    except (ImportError, ValueError, OSError):
+        pass
     if sys.stdout is None:
         sys.stdout = log
     if sys.stderr is None:
