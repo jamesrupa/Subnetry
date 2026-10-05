@@ -656,3 +656,15 @@ tr.hl td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .bin-row .mono { font-size: 12px; }
 }
 .grid-2 > *, .explainers > *, .dns-grid > * { min-width: 0; }
+
+/* --- Health check: mode steps & improvement plan ------------------------------------------- */
+.mode-steps { margin: 6px 0 8px; padding-left: 18px; color: var(--text-secondary); display: grid; gap: 3px; font-size: 14px; }
+.mode-steps li::marker { color: var(--accent); }
+.improve-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.improve-list li { display: flex; gap: 14px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border);
+  border-left: 3px solid var(--warning); border-radius: 6px; background: var(--surface-2); }
+.improve-list li.critical { border-left-color: var(--critical); }
+.improve-list .pts { font: 700 15px var(--mono); color: var(--good); min-width: 42px; padding-top: 1px; }
+.improve-list b { display: block; }
+.improve-list p { margin: 4px 0 0; color: var(--text-secondary); font-size: 14px; }
+.improve-list div { min-width: 0; overflow-wrap: anywhere; }

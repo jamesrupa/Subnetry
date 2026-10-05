@@ -249,6 +249,12 @@ async def scan_network(
     }
 
 
+def service_name(port: int) -> str:
+    from .topports import SERVICES
+
+    return COMMON_PORTS.get(port) or SERVICES.get(port, "unknown")
+
+
 async def scan_ports(
     host: str, ports: list[int] | None = None, timeout: float = 0.8, concurrency: int = 100
 ) -> dict:
@@ -268,7 +274,7 @@ async def scan_ports(
         "scanned": len(ports),
         "seconds": round(time.perf_counter() - started, 1),
         "open": [
-            {"port": p, "service": COMMON_PORTS.get(p, "unknown")}
+            {"port": p, "service": service_name(p)}
             for p, state in sorted(results) if state == "open"
         ],
     }

@@ -150,6 +150,11 @@ def stub_tools(monkeypatch):
     async def scan_ports(ip, **_):
         return {"host": ip, "scanned": 1, "seconds": 0, "open": [{"port": 23, "service": "Telnet"}] if ip.endswith(".9") else []}
 
+    async def ookla_status():
+        return {"installed": False}
+
+    monkeypatch.setattr(diagnose.ookla, "status", ookla_status)
+    monkeypatch.setattr(diagnose.nmapscan, "find_nmap", lambda: None)
     monkeypatch.setattr(diagnose.netinfo, "overview", overview)
     monkeypatch.setattr(diagnose.speedtest, "run_speedtest", speedtest)
     monkeypatch.setattr(diagnose.wifiscan, "scan_wifi", wifi)
@@ -161,25 +166,124 @@ async def run(mode):
     return [ev async for ev in diagnose.run_diagnosis(mode)]
 
 
-def test_quick_scan_runs_only_speed(stub_tools):
+def test_quick_scan_runs_speed_and_wifi(stub_tools):
     events = asyncio.run(run("quick"))
-    assert events[0]["type"] == "plan" and [s["id"] for s in events[0]["steps"]] == ["speed"]
+    assert events[0]["type"] == "plan" and [s["id"] for s in events[0]["steps"]] == ["speed", "wifi"]
     rep = events[-1]["report"]
-    assert rep["speed"]["download_mbps"] == 300.0
-    assert "wifi" not in rep and "network" not in rep
-    assert rep["score"]["value"] == 100
+    assert rep["speed"]["download_mbps"] == 300.0 and rep["speed"]["engine_id"] == "cloudflare"
+    assert rep["wifi"]["networks"] and "network" not in rep
+    # Cloudflare was used because the Ookla CLI is missing: say so, without costing points.
+    assert "Measured with Cloudflare (Speedtest.net CLI not installed)" in titles(rep["recommendations"], "info")
+    assert any(r["category"] == "Wi-Fi" for r in rep["recommendations"])
+    assert rep["score"]["value"] == advisor.score(rep["recommendations"])["value"]
 
 
 def test_full_scan_combines_everything(stub_tools):
     events = asyncio.run(run("full"))
-    assert [s["id"] for s in events[0]["steps"]] == ["speed", "wifi", "devices", "ports"]
+    assert [s["id"] for s in events[0]["steps"]] == ["speed", "devices", "ports", "wifi"]
     statuses = [(e["step"], e["status"]) for e in events if e["type"] == "step" and e["status"] != "running"]
-    assert statuses == [("speed", "done"), ("wifi", "done"), ("devices", "done"), ("ports", "done")]
+    assert statuses == [("speed", "done"), ("devices", "done"), ("ports", "done"), ("wifi", "done")]
     rep = events[-1]["report"]
     assert [h["ip"] for h in rep["network"]["hosts"]] == ["192.168.1.1", "192.168.1.9"]
     assert rep["network"]["hosts"][1]["ports"]["open"][0]["port"] == 23
+    assert rep["port_scan"]["engine"] == "built-in" and rep["port_scan"]["ports"] == 1000
     assert any("Telnet" in r["title"] for r in rep["recommendations"])
     assert rep["score"]["value"] < 100
+    top = rep["score"]["improvements"][0]
+    assert "Telnet" in top["title"] and top["points"] > 0 and top["action"]
+
+
+def test_full_scan_uses_top_1000_ports(stub_tools, monkeypatch):
+    seen = {}
+
+    async def scan_ports(ip, ports=None, **_):
+        seen[ip] = ports
+        return {"host": ip, "scanned": len(ports), "seconds": 0, "open": []}
+
+    monkeypatch.setattr(diagnose.netscan, "scan_ports", scan_ports)
+    rep = asyncio.run(run("full"))[-1]["report"]
+    assert all(len(p) == 1000 and p[:3] == [80, 23, 443] for p in seen.values())
+    assert "No risky services found" in titles(rep["recommendations"], "good")
+
+
+def test_full_scan_prefers_nmap(stub_tools, monkeypatch):
+    calls = []
+
+    async def scan_hosts_top_ports(ips):
+        calls.append(ips)
+        yield {"type": "progress", "task": "Connect Scan", "percent": 50.0}
+        yield {"type": "result", "result": {"hosts": [
+            {"ip": "192.168.1.9", "vendor": "Acme", "ports": [
+                {"port": 3306, "protocol": "tcp", "state": "open", "service": "mysql"},
+                {"port": 9, "protocol": "tcp", "state": "open|filtered", "service": "discard"}]},
+        ]}}
+
+    async def must_not_run(*_a, **_k):
+        raise AssertionError("built-in scanner used although nmap is available")
+
+    monkeypatch.setattr(diagnose.nmapscan, "find_nmap", lambda: "/usr/bin/nmap")
+    monkeypatch.setattr(diagnose.nmapscan, "scan_hosts_top_ports", scan_hosts_top_ports)
+    monkeypatch.setattr(diagnose.netscan, "scan_ports", must_not_run)
+    events = asyncio.run(run("full"))
+    rep = events[-1]["report"]
+    assert calls == [["192.168.1.1", "192.168.1.9"]] and rep["port_scan"]["engine"] == "nmap"
+    host = rep["network"]["hosts"][1]
+    assert host["ports"]["open"] == [{"port": 3306, "service": "mysql"}] and host["vendor"] == "Acme"
+    assert rep["network"]["hosts"][0]["ports"]["open"] == []
+    assert any(e["event"].get("type") == "progress" for e in events if e["type"] == "step_event" and e["step"] == "ports")
+    # MySQL isn't in the built-in risky list, but the port reference marks it risky.
+    assert any("MySQL" in t and "port 3306" in t for t in titles(rep["recommendations"], "warning"))
+
+
+def test_nmap_failure_falls_back_to_builtin(stub_tools, monkeypatch):
+    async def broken(ips):
+        raise diagnose.netscan.ScanError("nmap exited with code 1")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(diagnose.nmapscan, "find_nmap", lambda: "/usr/bin/nmap")
+    monkeypatch.setattr(diagnose.nmapscan, "scan_hosts_top_ports", broken)
+    events = asyncio.run(run("full"))
+    notices = [e["event"]["message"] for e in events if e["type"] == "step_event" and e["event"].get("type") == "notice"]
+    assert notices and "built-in" in notices[0]
+    assert events[-1]["report"]["port_scan"]["engine"] == "built-in"
+
+
+def test_speed_prefers_ookla_and_falls_back(stub_tools, monkeypatch):
+    from subnetry.tools import ookla
+
+    async def installed():
+        return {"installed": True}
+
+    async def ookla_ok(server_id=None):
+        yield {"phase": "done", "type": "result", "latency_ms": 9.0, "jitter_ms": 1.0,
+               "download_mbps": 900.0, "upload_mbps": 80.0, "engine": "Speedtest.net (Ookla)"}
+
+    async def ookla_broken(server_id=None):
+        yield {"phase": "error", "type": "error", "message": "No servers available"}
+
+    monkeypatch.setattr(diagnose.ookla, "status", installed)
+    monkeypatch.setattr(ookla, "run", ookla_ok)
+    rep = asyncio.run(run("quick"))[-1]["report"]
+    assert rep["speed"]["engine_id"] == "ookla" and rep["speed"]["download_mbps"] == 900.0
+    assert not any("Cloudflare" in t for t in titles(rep["recommendations"]))
+
+    monkeypatch.setattr(ookla, "run", ookla_broken)
+    events = asyncio.run(run("quick"))
+    rep = events[-1]["report"]
+    assert rep["speed"]["engine_id"] == "cloudflare" and rep["speed"]["download_mbps"] == 300.0
+    assert rep["speed"]["fallback_reason"] == "No servers available"
+    assert "Measured with Cloudflare (Speedtest.net didn't finish)" in titles(rep["recommendations"], "info")
+    assert any(e["event"].get("type") == "fallback" for e in events if e["type"] == "step_event")
+
+
+def test_improvements_rank_by_points():
+    recs = [advisor.rec("warning", "Wi-Fi", "Weak signal", "d", "Move closer"),
+            advisor.rec("critical", "Security", "Telnet open", "d", "Disable Telnet"),
+            advisor.rec("good", "Speed", "Fast", "d")]
+    plan = advisor.score(recs)["improvements"]
+    assert [p["title"] for p in plan] == ["Telnet open", "Weak signal"]
+    # 65 now. Fixing Telnet: 90. Fixing only the weak signal: 75, but a remaining critical caps it at 74, so +9.
+    assert plan[0]["points"] == 25 and plan[1]["points"] == 9 and plan[0]["action"] == "Disable Telnet"
 
 
 def test_failing_step_does_not_abort(stub_tools, monkeypatch):
@@ -220,8 +324,11 @@ def test_api_full_scan_saves_and_exports(stub_tools, monkeypatch, tmp_path):
         body = r.read().decode()
     events = [json.loads(line[6:]) for line in body.splitlines() if line.startswith('data: {"')]
     rep = events[-1]["report"]
-    assert len(rep["saved_files"]) == 2
-    assert sorted(p.suffix for p in tmp_path.iterdir() if not p.name.startswith(".")) == [".html", ".json"]
+    assert len(rep["saved_files"]) == 4
+    names = sorted(p.name.split(".", 1)[1] for p in tmp_path.iterdir() if not p.name.startswith("."))
+    assert names == ["devices.csv", "html", "json", "wifi.csv"]
+    saved = next(p for p in tmp_path.iterdir() if p.name.endswith(".devices.csv")).read_text()
+    assert "192.168.1.9" in saved and "23/Telnet" in saved
 
     r = client.get(f"/api/reports/{rep['id']}/export", params={"format": "devices.csv"})
     assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]

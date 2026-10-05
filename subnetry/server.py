@@ -273,7 +273,7 @@ async def _diagnose_and_store(mode: str) -> AsyncIterator[dict]:
                 REPORTS.pop(next(iter(REPORTS)))
             if mode == "full":  # full scans are exported to the reports folder automatically
                 try:
-                    rep["saved_files"] = report.save(rep)
+                    rep["saved_files"] = report.save(rep, report.FULL_SCAN_FILES)
                 except OSError as exc:
                     rep["save_error"] = f"Could not save the report: {exc}"
         yield ev

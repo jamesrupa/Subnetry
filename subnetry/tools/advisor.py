@@ -18,6 +18,32 @@ def rec(severity: str, category: str, title: str, detail: str, action: str = "")
 
 # --- speed ------------------------------------------------------------------------
 
+OOKLA_INSTALL = {
+    "Darwin": "`brew tap teamookla/speedtest`, `brew trust teamookla/speedtest`, then `brew install speedtest --force`",
+    "Windows": "`winget install Ookla.Speedtest.CLI` in PowerShell",
+    "Linux": "the instructions at speedtest.net/apps/cli",
+}
+
+
+def engine_notes(speed: dict) -> list[dict]:
+    """Say when the result came from Cloudflare instead of Speedtest.net, and why."""
+    if speed.get("engine_id") != "cloudflare":
+        return []
+    if speed.get("fallback_reason"):
+        return [rec("info", "Speed", "Measured with Cloudflare (Speedtest.net didn't finish)",
+                    f"Speedtest.net failed ({speed['fallback_reason']}), so Cloudflare's test was used instead. "
+                    "Results are comparable but can differ by a few percent.",
+                    "Run the Speed Test tab again later to get a Speedtest.net result.")]
+    if speed.get("ookla_installed") is False:
+        import platform
+
+        how = OOKLA_INSTALL.get(platform.system(), OOKLA_INSTALL["Linux"])
+        return [rec("info", "Speed", "Measured with Cloudflare (Speedtest.net CLI not installed)",
+                    "Subnetry prefers Speedtest.net (Ookla), the test most ISPs quote, but its command-line tool "
+                    "isn't installed, so Cloudflare's test was used.",
+                    f"Install the Speedtest.net CLI with {how}, then restart Subnetry.")]
+    return []
+
 def speed_rules(speed: dict | None) -> list[dict]:
     if not speed:
         return []
@@ -26,9 +52,9 @@ def speed_rules(speed: dict | None) -> list[dict]:
             "critical", "Speed", "Speed test could not complete",
             f"The test servers could not be reached ({speed['error']}).",
             "Check that you are online: open a website, restart the router/modem, and make sure no "
-            "firewall or VPN is blocking speed.cloudflare.com.",
+            "firewall or VPN is blocking the speed test servers.",
         )]
-    out = []
+    out = engine_notes(speed)
     down, up = speed.get("download_mbps"), speed.get("upload_mbps")
     lat, jit = speed.get("latency_ms"), speed.get("jitter_ms")
 
@@ -272,18 +298,38 @@ def network_rules(network: dict | None, system: dict | None) -> list[dict]:
     return out
 
 
+def _risky_port(port: int) -> tuple[str, str, str, str] | None:
+    """(severity, name, why, action) for a port worth flagging, or None."""
+    if port in RISKY_PORTS:
+        return RISKY_PORTS[port]
+    from .portref import describe
+
+    entry = next((p for p in describe(port) if p["protocol"] == "TCP" and p["risk"] == "risky"), None)
+    if entry is None:
+        return None
+    why = entry["description"].rstrip(".")
+    return ("warning", entry["name"], f"is reachable. {why}" if why else "is reachable",
+            (entry["note"] + " " if entry["note"] else "") + "Disable the service if it isn't needed, and never forward this port on the router.")
+
+
 def port_rules(hosts: list[dict]) -> list[dict]:
     """Risky services, grouped per port so one recommendation lists every affected device."""
     by_port: dict[int, list[str]] = {}
-    for h in hosts:
-        for p in (h.get("ports") or {}).get("open", []):
-            if p["port"] in RISKY_PORTS:
+    scanned = [h for h in hosts if h.get("ports") is not None]
+    for h in scanned:
+        for p in h["ports"].get("open", []):
+            if _risky_port(p["port"]):
                 by_port.setdefault(p["port"], []).append(h["ip"])
     out = []
-    for port, ips in sorted(by_port.items(), key=lambda kv: SEVERITY_ORDER[RISKY_PORTS[kv[0]][0]]):
-        sev, name, why, action = RISKY_PORTS[port]
+    for port, ips in sorted(by_port.items(), key=lambda kv: SEVERITY_ORDER[_risky_port(kv[0])[0]]):
+        sev, name, why, action = _risky_port(port)
         out.append(rec(sev, "Security", f"{name} (port {port}) open on {len(ips)} device{'s' if len(ips) > 1 else ''}",
                        f"{', '.join(ips)}: {name} {why}.", action))
+    if scanned and not by_port:
+        count = max((h["ports"].get("scanned", 0) for h in scanned), default=0)
+        out.append(rec("good", "Security", "No risky services found",
+                       f"Checked {count or 'the common'} ports on {len(scanned)} device{'s' if len(scanned) > 1 else ''}: "
+                       "nothing like Telnet, FTP, Remote Desktop, VNC or open databases is reachable."))
     return out
 
 
@@ -321,10 +367,32 @@ def recommend(report: dict) -> list[dict]:
     return sorted(recs, key=lambda r: SEVERITY_ORDER[r["severity"]])
 
 
-def score(recs: list[dict]) -> dict:
+def _score_value(recs: list[dict]) -> int:
     value = max(0, 100 - sum(PENALTY[r["severity"]] for r in recs))
     if any(r["severity"] == "critical" for r in recs):
         value = min(value, 74)  # a critical problem never grades better than "Fair"
-    grade = "Excellent" if value >= 90 else "Good" if value >= 75 else "Fair" if value >= 50 else "Poor"
+    return value
+
+
+def grade_for(value: int) -> str:
+    return "Excellent" if value >= 90 else "Good" if value >= 75 else "Fair" if value >= 50 else "Poor"
+
+
+def improvements(recs: list[dict], limit: int = 5) -> list[dict]:
+    """The fixes that would raise the score most, with how many points each is worth."""
+    current = _score_value(recs)
+    out = []
+    for i, r in enumerate(recs):
+        if not PENALTY[r["severity"]]:
+            continue
+        gain = _score_value(recs[:i] + recs[i + 1:]) - current
+        out.append({"title": r["title"], "action": r["action"] or r["detail"], "severity": r["severity"],
+                    "category": r["category"], "points": gain})
+    out.sort(key=lambda x: (-x["points"], SEVERITY_ORDER[x["severity"]]))
+    return out[:limit]
+
+
+def score(recs: list[dict]) -> dict:
+    value = _score_value(recs)
     counts = {s: sum(1 for r in recs if r["severity"] == s) for s in SEVERITY_ORDER}
-    return {"value": value, "grade": grade, "counts": counts}
+    return {"value": value, "grade": grade_for(value), "counts": counts, "improvements": improvements(recs)}

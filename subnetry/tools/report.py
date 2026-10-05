@@ -22,6 +22,9 @@ EXPORTS = {
 }
 
 
+# Saved automatically after every full scan: the report plus the device list (with open ports) and Wi-Fi list.
+FULL_SCAN_FILES = ("html", "json", "devices.csv", "wifi.csv")
+
 LEGACY_REPORTS_DIR = "NetApp-Reports"  # the app's previous name
 
 
@@ -71,11 +74,12 @@ def devices_csv(report: dict) -> str:
         role = "gateway" if h.get("is_gateway") else "this device" if h.get("is_self") else ""
         ports = (h.get("ports") or {}).get("open")
         rows.append([
-            h["ip"], h.get("hostname") or "", h.get("mac") or "", "yes" if h.get("mac_randomized") else "",
+            h["ip"], h.get("hostname") or "", h.get("mac") or "", h.get("vendor") or "",
+            "yes" if h.get("mac_randomized") else "",
             role, "+".join(h.get("methods", [])), h.get("rtt_ms") if h.get("rtt_ms") is not None else "",
             " ".join(f"{p['port']}/{p['service']}" for p in ports) if ports is not None else "not scanned",
         ])
-    return _csv(["ip", "hostname", "mac", "randomized_mac", "role", "detected_by", "response_ms", "open_ports"], rows)
+    return _csv(["ip", "hostname", "mac", "vendor", "randomized_mac", "role", "detected_by", "response_ms", "open_ports"], rows)
 
 
 def wifi_csv(report: dict) -> str:
@@ -107,6 +111,7 @@ h1 { font-size:24px; margin:0; } h2 { font-size:17px; margin:32px 0 10px; border
 .critical .sev { color:var(--critical); } .warning .sev { color:var(--warning); } .info .sev { color:var(--accent); } .good .sev { color:var(--good); }
 .rec h3 { font-size:15px; margin:2px 0; } .rec p { margin:4px 0; }
 .rec .action { background:var(--soft); border-radius:6px; padding:6px 10px; }
+.improve { padding-left:20px; } .improve li { margin:6px 0; break-inside:avoid; } .improve b { color:var(--good, #047857); margin-right:6px; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
 th { background:var(--soft); font-size:12px; color:var(--muted); }
@@ -126,7 +131,8 @@ def _speed_html(speed: dict | None) -> str:
     if speed.get("packet_loss") is not None:
         tiles.append(("Packet loss", speed["packet_loss"], "%"))
     srv = speed.get("server") or {}
-    where = " · ".join(escape(str(x)) for x in (speed.get("engine"), srv.get("name"), srv.get("location"), speed.get("isp")) if x)
+    parts = (speed.get("engine"), srv.get("name"), srv.get("location"), speed.get("isp"))
+    where = " · ".join(escape(str(x)) for x in dict.fromkeys(x for x in parts if x))  # no "Cloudflare · Cloudflare"
     link = f" · <a href='{escape(speed['result_url'])}'>speedtest.net result</a>" if speed.get("result_url") else ""
     return f"<h2>Speed test</h2><p class='muted'>{where}{link}</p><div class='tiles'>" + "".join(
         f"<div class='tile'><div class='l'>{label}</div><div class='v'>{'–' if v is None else f'{v:g}'}<small>{unit}</small></div></div>"
@@ -157,7 +163,16 @@ def _wifi_html(wifi: dict | None) -> str:
             f"<th>Security</th></tr></thead><tbody>{rows}</tbody></table>")
 
 
-def _devices_html(network: dict | None) -> str:
+def _improve_html(score: dict) -> str:
+    plan = score.get("improvements") or []
+    if not plan:
+        return ""
+    items = "".join(f"<li><b>+{p['points']}</b> {escape(p['title'])}<br><span class='muted'>{escape(p['action'])}</span></li>"
+                    for p in plan)
+    return f"<h2>How to improve your score</h2><ol class='improve'>{items}</ol>"
+
+
+def _devices_html(network: dict | None, port_scan: dict | None = None) -> str:
     if network is None:
         return ""
     if network.get("error"):
@@ -170,9 +185,14 @@ def _devices_html(network: dict | None) -> str:
         port_txt = ", ".join(f"{p['port']} {escape(p['service'])}" for p in ports) if ports else ("none" if ports is not None else "–")
         mac = escape(h.get("mac") or "–") + (" <span class='muted'>(private)</span>" if h.get("mac_randomized") else "")
         rows.append(f"<tr><td class='mono'>{escape(h['ip'])}{role}</td><td>{escape(h.get('hostname') or '–')}</td>"
-                    f"<td class='mono'>{mac}</td><td>{port_txt}</td></tr>")
-    return (f"<h2>Devices on {escape(str(network.get('network', '')))} ({len(hosts)})</h2>"
-            "<table><thead><tr><th>IP</th><th>Hostname</th><th>MAC</th><th>Open ports</th></tr></thead>"
+                    f"<td class='mono'>{mac}</td><td>{escape(h.get('vendor') or '–')}</td><td>{port_txt}</td></tr>")
+    scan_note = ""
+    if port_scan and port_scan.get("engine"):
+        engine = "Nmap" if port_scan["engine"] == "nmap" else "Subnetry's built-in scanner"
+        scan_note = (f"<p class='muted'>Port scan: the {port_scan['ports']} most common TCP ports on each device, "
+                     f"with {engine}" + (f", in {port_scan['seconds']} s" if port_scan.get("seconds") is not None else "") + ".</p>")
+    return (f"<h2>Devices on {escape(str(network.get('network', '')))} ({len(hosts)})</h2>{scan_note}"
+            "<table><thead><tr><th>IP</th><th>Hostname</th><th>MAC</th><th>Vendor</th><th>Open ports</th></tr></thead>"
             f"<tbody>{''.join(rows)}</tbody></table>")
 
 
@@ -199,10 +219,11 @@ gateway {escape(sys.get('gateway') or '–')} · took {report.get('duration_s', 
   <div class="tile"><div class="l">Warnings</div><div class="v">{counts.get('warning', 0)}</div></div>
   <div class="tile"><div class="l">Looks good</div><div class="v">{counts.get('good', 0)}</div></div>
 </div>
+{_improve_html(sc)}
 <h2>Recommendations</h2>{recs or "<p class='muted'>No recommendations.</p>"}
 {_speed_html(report.get('speed'))}
 {_wifi_html(report.get('wifi'))}
-{_devices_html(report.get('network'))}
+{_devices_html(report.get('network'), report.get('port_scan'))}
 <p class="muted" style="margin-top:32px">Generated by Subnetry. Report ID {escape(report['id'])}.</p>
 </main></body></html>"""
 

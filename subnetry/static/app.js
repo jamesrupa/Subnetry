@@ -845,7 +845,7 @@ $("#wifi-start").addEventListener("click", async () => {
 // --- Health check -----------------------------------------------------------------------
 
 const STEP_ICON = { pending: "○", running: "●", done: "✔", error: "✖" };
-const DETAIL_TAB = { speed: ["speed", "Speed Test"], wifi: ["wifi", "Wi-Fi Scanner"], devices: ["scan", "Network Scanner"] };
+const DETAIL_TAB = { speed: ["speed", "Speed Test"], devices: ["scan", "Network Scanner"], wifi: ["wifi", "Wi-Fi Scanner"] };
 let hcReport = null;
 let hcFilter = "all";
 
@@ -893,14 +893,23 @@ function renderReport(rep) {
     animateNumber($("#hc-score .score-num"), sc.value, { duration: 900 });
   }));
 
+  const plan = sc.improvements || [];
+  $("#hc-improve-card").hidden = !plan.length;
+  if (plan.length) {
+    const total = Math.min(100 - sc.value, plan.reduce((sum, p) => sum + p.points, 0));
+    $("#hc-improve-note").textContent = `Up to +${total} points`;
+    $("#hc-improve").innerHTML = plan.map((p) => `<li class="${p.severity}">
+      <span class="pts">+${p.points}</span>
+      <div><b>${esc(p.title)}</b><span class="sub">${esc(p.category)}</span><p>${esc(p.action)}</p></div></li>`).join("");
+  }
+
   $("#hc-filters").innerHTML = [["all", `All (${rep.recommendations.length})`],
     ...Object.keys(SEV).filter((k) => n[k]).map((k) => [k, `${SEV[k].label} (${n[k]})`])]
     .map(([k, label]) => `<button type="button" data-filter="${k}">${label}</button>`).join("");
   renderRecs();
 
-  const exports = rep.mode === "full"
-    ? [["html", "HTML report"], ["json", "JSON"], ["recommendations.csv", "Recommendations CSV"], ["devices.csv", "Devices CSV"], ["wifi.csv", "Wi-Fi CSV"]]
-    : [["html", "HTML report"], ["json", "JSON"], ["recommendations.csv", "Recommendations CSV"]];
+  const exports = [["html", "HTML report"], ["json", "JSON"], ["recommendations.csv", "Recommendations CSV"],
+    ...(rep.network ? [["devices.csv", "Devices CSV"]] : []), ...(rep.wifi ? [["wifi.csv", "Wi-Fi CSV"]] : [])];
   $("#hc-export").innerHTML = exports.map(([fmt, label]) =>
     `<a class="btn small" href="/api/reports/${encodeURIComponent(rep.id)}/export?format=${encodeURIComponent(fmt)}" download>${label}</a>`).join("");
   const saved = $("#hc-saved");
@@ -946,6 +955,7 @@ function startDiagnosis(mode) {
       const e = ev.event;
       if (e.type === "error") { update(ev.step, { detail: e.message }); return; }
       if (ev.step === "speed") {
+        if (e.type === "fallback") { resetSpeed(); update("speed", { detail: e.message }); return; }
         const line = applySpeedEvent(e);
         if (line) update("speed", { detail: line });
       } else if (ev.step === "wifi") {
@@ -957,9 +967,11 @@ function startDiagnosis(mode) {
         if (e.type === "progress") update("devices", { detail: `${e.done} / ${e.total} addresses checked · ${hosts.size} devices found` });
         if (e.type === "done") update("devices", { detail: `${e.hosts_found} devices found on ${e.network}` });
       } else if (ev.step === "ports") {
+        if (e.type === "notice") { update("ports", { detail: e.message }); return; }
+        if (e.type === "progress") { update("ports", { detail: `Nmap: ${Math.round(e.percent)}% done` }); return; }
         const h = hosts.get(e.ip);
         if (h) { h.ports = e.ports; renderHosts(); }
-        update("ports", { detail: `${e.done} / ${e.total} devices checked` });
+        update("ports", { detail: `${e.done} / ${e.total} devices checked (${e.ports.engine === "nmap" ? "Nmap" : "built-in scanner"})` });
       }
     } else if (ev.type === "report") {
       $("#hc-progress-title").textContent = `${mode === "full" ? "Full" : "Quick"} scan finished in ${ev.report.duration_s}s`;

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from ..system import IS_WINDOWS, find_tool, stream_cmd
 from . import advisor
+from . import netscan
 from .netscan import MAX_HOSTS, ScanError
 
 PROFILES = {
@@ -208,21 +209,11 @@ def findings(result: dict, gateway: str | None = None) -> list[dict]:
     return sorted(recs, key=lambda r: advisor.SEVERITY_ORDER[r["severity"]])
 
 
-async def run_scan(
-    target: str, profile: str = "quick", os_detect: bool = False, scripts: bool = False, gateway: str | None = None,
-    authorized: bool = False,
-) -> AsyncIterator[dict]:
-    nmap = find_nmap()
-    if not nmap:
-        raise ScanError("Nmap is not installed. " + status()["install_help"])
-    t = await asyncio.to_thread(check_target, target, authorized)
-    target = t.value
-    fd, xml_path = tempfile.mkstemp(suffix=".xml", prefix="subnetry-nmap-")
-    os.close(fd)
-    args = build_args(nmap, target, profile, os_detect, scripts, xml_path, skip_ping=t.public and t.single)
-    started = time.perf_counter()
-    yield {"type": "start", "target": target, "profile": profile, "public": t.public, "resolved": t.resolved,
-           "command": " ".join(["nmap", *args[1:-3], target])}
+async def _stream_nmap(args: list[str], xml_path: str) -> AsyncIterator[dict]:
+    """Run nmap, yielding its progress events, then {"type": "_result"} with the parsed XML.
+
+    Removes xml_path afterwards. Raises ScanError if nmap fails.
+    """
     errors: list[str] = []
     try:
         async for kind, line in stream_cmd(args):
@@ -244,7 +235,51 @@ async def run_scan(
             os.remove(xml_path)
         except OSError:
             pass
+    result["warnings"] = errors
+    yield {"type": "_result", "result": result}
+
+
+TOP_PORTS_ARGS = ["-T4", "--top-ports", "1000", "-Pn"]
+
+
+async def scan_hosts_top_ports(ips: list[str]) -> AsyncIterator[dict]:
+    """The Full Scan's port check: Nmap's top 1000 TCP ports on devices already found on the LAN.
+
+    -Pn because the devices are known to be up (phones often ignore ping). Yields nmap progress
+    events, then {"type": "result", "result": parse_xml(...)}.
+    """
+    nmap = find_nmap()
+    if not nmap:
+        raise ScanError("Nmap is not installed.")
+    ips = [netscan.check_private_host(ip) for ip in ips]  # only ever local devices
+    fd, xml_path = tempfile.mkstemp(suffix=".xml", prefix="subnetry-nmap-")
+    os.close(fd)
+    args = [nmap, *TOP_PORTS_ARGS, "-v", "--stats-every", "2s", "-oX", xml_path, *ips]
+    async for ev in _stream_nmap(args, xml_path):
+        yield {**ev, "type": "result"} if ev["type"] == "_result" else ev
+
+
+async def run_scan(
+    target: str, profile: str = "quick", os_detect: bool = False, scripts: bool = False, gateway: str | None = None,
+    authorized: bool = False,
+) -> AsyncIterator[dict]:
+    nmap = find_nmap()
+    if not nmap:
+        raise ScanError("Nmap is not installed. " + status()["install_help"])
+    t = await asyncio.to_thread(check_target, target, authorized)
+    target = t.value
+    fd, xml_path = tempfile.mkstemp(suffix=".xml", prefix="subnetry-nmap-")
+    os.close(fd)
+    args = build_args(nmap, target, profile, os_detect, scripts, xml_path, skip_ping=t.public and t.single)
+    started = time.perf_counter()
+    yield {"type": "start", "target": target, "profile": profile, "public": t.public, "resolved": t.resolved,
+           "command": " ".join(["nmap", *args[1:-3], target])}
+    result: dict = {}
+    async for ev in _stream_nmap(args, xml_path):
+        if ev["type"] == "_result":
+            result = ev["result"]
+        else:
+            yield ev
     result["findings"] = findings(result, gateway)
     result["seconds"] = round(time.perf_counter() - started, 1)
-    result["warnings"] = errors
     yield {"type": "result", "result": result}
