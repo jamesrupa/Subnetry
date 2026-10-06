@@ -207,3 +207,15 @@ def test_wifi_monitor_uses_helper_on_mac(fake_mac, monkeypatch):
         return out
     samples = [e for e in asyncio.run(run()) if e["type"] == "sample"]
     assert samples and samples[-1]["ssid"] == "HomeNet" and samples[-1]["bssid"] == "A4:2B:B0:11:22:33"
+
+
+def test_prebuilt_helper_is_used_without_compiling(fake_mac, monkeypatch, tmp_path):
+    """The downloadable app ships the helper ready-made: no Swift compiler needed on the user's Mac."""
+    prebuilt = tmp_path / "prebuilt" / macos_helper.APP_NAME
+    (prebuilt / "Contents" / "MacOS").mkdir(parents=True)
+    (prebuilt / "Contents" / "MacOS" / macos_helper.EXECUTABLE).write_text("binary")
+    monkeypatch.setattr(macos_helper, "PREBUILT", prebuilt)
+    monkeypatch.setattr(macos_helper, "_find_swiftc", lambda: None)  # would fail if it tried to compile
+    app = macos_helper.ensure_built()
+    assert (app / "Contents" / "MacOS" / macos_helper.EXECUTABLE).read_text() == "binary"
+    assert not fake_mac["builds"].exists()

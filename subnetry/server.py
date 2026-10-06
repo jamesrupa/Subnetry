@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .tools import dashboard, diagnose, dnsdumpster, dnsinfo, ipinfo, macos, macvendor, portref, subnetcalc, netinfo, netscan, nmapscan, ookla, report, speedtest, traceroute, traffic, wifimonitor, wifiscan
+from .tools import dashboard, diagnose, setup, dnsdumpster, dnsinfo, ipinfo, macos, macvendor, portref, subnetcalc, netinfo, netscan, nmapscan, ookla, report, speedtest, traceroute, traffic, wifimonitor, wifiscan
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -258,6 +258,17 @@ async def nmap_scan(target: str, profile: str = "quick", os_detect: bool = False
         async for ev in nmapscan.run_scan(target, profile, os_detect, scripts, gateway, authorized):
             yield ev
     return sse(run())
+
+
+@app.get("/api/setup/status")
+async def setup_status():
+    return await setup.status()
+
+
+@app.get("/api/setup/install")
+async def setup_install(tool: str = Query(..., pattern="^(speedtest|nmap|wireshark)$")):
+    """Install one optional tool (fixed commands only); progress streams as events."""
+    return sse(setup.install(tool))
 
 
 @app.get("/api/traceroute/status")

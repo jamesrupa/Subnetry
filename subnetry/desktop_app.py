@@ -140,7 +140,9 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
 
     port = pick_port(host, port)
     url = f"http://{host}:{port}/"
-    config = uvicorn.Config("subnetry.server:app", host=host, port=port, log_level="warning")
+    from .server import app
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="warning")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, name="subnetry-server", daemon=True)
     thread.start()
@@ -190,7 +192,11 @@ def run_window(host: str = "127.0.0.1", port: int = 8765) -> bool:
 
     threading.Thread(target=watchdog, name="subnetry-window-watchdog", daemon=True).start()
     # Keep browser storage between runs (theme choice etc.); pywebview defaults to a private session.
-    storage = Path.home() / (".subnetry" if sys.platform != "darwin" else "Library/Application Support/Subnetry") / "webview"
+    from .system import FROZEN, app_data_dir
+
+    # Source installs keep the folder they always used, so the saved theme etc. carries over.
+    storage = (app_data_dir() if FROZEN else
+               Path.home() / (".subnetry" if sys.platform != "darwin" else "Library/Application Support/Subnetry")) / "webview"
     storage.mkdir(parents=True, exist_ok=True)
     options = {"private_mode": False, "storage_path": str(storage), "icon": str(window_icon())}
     _log("Opening the window…")
@@ -299,7 +305,9 @@ def remove_legacy_launchers() -> list[str]:
 def protected_location_warning(project_dir: Path | None = None) -> str | None:
     """Subnetry cloned inside C:\\Windows (an Administrator PowerShell starts in System32): the window
     engine can't write its files there when the app runs as a normal user, so the window never opens."""
-    if sys.platform != "win32":
+    from .system import FROZEN
+
+    if sys.platform != "win32" or FROZEN:  # the installer picks the folder for the packaged app
         return None
     windir = Path(os.environ.get("WINDIR") or os.environ.get("SystemRoot") or r"C:\Windows")
     folder = (project_dir or PROJECT_DIR).resolve()
@@ -315,6 +323,11 @@ def protected_location_warning(project_dir: Path | None = None) -> str | None:
 
 
 def install_launcher() -> str:
+    from .system import FROZEN
+
+    if FROZEN:
+        raise SystemExit("This is the installed Subnetry app: its installer already added it to "
+                         + ("Applications." if sys.platform == "darwin" else "the Start menu."))
     warning = protected_location_warning()
     if warning:
         raise SystemExit(warning)

@@ -734,3 +734,15 @@ tr.hl td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .toolbar label:has(#tc-target) { flex-basis: 100%; }
   .tc-node { max-width: 100%; }
 }
+
+/* --- Setup ----------------------------------------------------------------------------------- */
+.setup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.setup-grid > * { min-width: 0; }
+.setup-card { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.setup-card p { margin: 0; color: var(--text-secondary); }
+.setup-card.ok { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.setup-actions { margin-top: auto; padding-top: 6px; }
+.setup-path { overflow-wrap: anywhere; }
+.badge.good-badge { color: var(--good); border-color: var(--good); }
+.setup-log { max-height: 260px; overflow: auto; margin: 0; padding: 10px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; font: 12px/1.5 var(--mono); white-space: pre-wrap; color: var(--text-secondary); }

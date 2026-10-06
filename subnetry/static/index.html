@@ -37,6 +37,7 @@
     <nav class="tabs" role="tablist" aria-label="Tools">
       <div class="nav-group">Home</div>
       <button role="tab" data-tab="dashboard">Dashboard</button>
+      <button role="tab" data-tab="setup">Setup</button>
       <div class="nav-group">Diagnose</div>
       <button role="tab" data-tab="health">Health Check</button>
       <div class="nav-group">Network</div>
@@ -103,6 +104,24 @@
           <dl class="facts" id="dash-facts"></dl>
         </div>
       </div>
+    </section>
+
+    <!-- Setup -------------------------------------------------------------------------------->
+    <section id="tab-setup" class="panel" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Setup</h1>
+          <p class="muted">Subnetry works on its own, but a few free tools unlock more: install any that are missing here.</p>
+        </div>
+        <button class="btn" id="setup-refresh" type="button">Re-check</button>
+      </div>
+      <p class="status" id="setup-status">Checking which tools are installed…</p>
+      <div class="setup-grid" id="setup-tools"></div>
+      <div class="card top-gap" id="setup-log-card" hidden>
+        <div class="card-head"><h2 id="setup-log-title">Installing…</h2><span id="setup-radar"></span></div>
+        <pre class="setup-log" id="setup-log"></pre>
+      </div>
+      <p class="sub top-gap" id="setup-builtin"></p>
     </section>
 
     <!-- Health check -------------------------------------------------------------->
@@ -649,6 +668,7 @@
   <script src="/static/traffic.js"></script>
   <script src="/static/dashboard.js"></script>
   <script src="/static/toolkit.js"></script>
+  <script src="/static/setup.js"></script>
   <script src="/static/main.js"></script>
 </body>
 </html>

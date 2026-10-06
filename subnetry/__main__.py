@@ -25,7 +25,10 @@ def attach_log_if_windowless() -> Path | None:
     """Started without a console (pythonw.exe from the Start-menu shortcut), sys.stdout and
     sys.stderr are None: printing fails and uvicorn can't even set up its logging. Send both
     to a log file instead. Returns the log's path, or None when there is a console."""
-    if sys.stdout is not None and sys.stderr is not None:
+    from .system import FROZEN
+
+    # The packaged app has no console either: on macOS its output would go nowhere when opened from Finder.
+    if sys.stdout is not None and sys.stderr is not None and not FROZEN:
         return None
     path = log_path()
     try:
@@ -40,9 +43,9 @@ def attach_log_if_windowless() -> Path | None:
         faulthandler.enable(log)  # a crash inside native code (e.g. the window engine) still leaves a trace
     except (ImportError, ValueError, OSError):
         pass
-    if sys.stdout is None:
+    if sys.stdout is None or FROZEN:
         sys.stdout = log
-    if sys.stderr is None:
+    if sys.stderr is None or FROZEN:
         sys.stderr = log
     return path
 
@@ -91,7 +94,11 @@ def _main() -> None:
     parser.add_argument("--install-app", action="store_true",
                         help="add a Subnetry launcher (macOS Applications / Windows Start menu / Linux app menu)")
     parser.add_argument("--uninstall-app", action="store_true", help="remove that launcher")
+    parser.add_argument("--install-tool", choices=["speedtest", "nmap", "wireshark"],
+                        help="install an optional tool, as the Setup page does (used by the Windows installer)")
     args = parser.parse_args()
+    if args.install_tool:
+        sys.exit(_install_tool(args.install_tool))
     if args.reports_dir:
         os.environ["SUBNETRY_REPORTS_DIR"] = os.path.abspath(args.reports_dir)
 
@@ -112,7 +119,31 @@ def _main() -> None:
     print(f"Subnetry running at {url}  (Ctrl+C to stop)")
     if not args.no_browser:
         threading.Timer(1.0, webbrowser.open, args=(url,)).start()
-    uvicorn.run("subnetry.server:app", host=args.host, port=args.port, log_level="warning")
+    from .server import app  # the object, not "subnetry.server:app": the packaged app can't import by name
+
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+
+
+def _install_tool(tool: str) -> int:
+    import asyncio
+
+    from .tools import setup
+
+    async def run() -> bool:
+        ok = False
+        async for ev in setup.install(tool):
+            if ev["type"] == "log":
+                print(ev["line"], flush=True)
+            elif ev["type"] == "done":
+                print(ev["message"], flush=True)
+                ok = ev["ok"]
+        return ok
+
+    try:
+        return 0 if asyncio.run(run()) else 1
+    except setup.SetupError as exc:
+        print(f"Couldn't install {tool}: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

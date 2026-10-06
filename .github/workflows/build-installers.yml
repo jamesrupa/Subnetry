@@ -1,0 +1,102 @@
+name: Build installers
+
+# Builds Subnetry-mac-arm64.dmg, Subnetry-mac-intel.dmg and Subnetry-Setup-windows-x64.exe.
+# Pushing a tag like v1.0.0 also publishes them as a GitHub Release, so a website can link to
+#   https://github.com/<owner>/<repo>/releases/latest/download/<file name>
+on:
+  push:
+    tags: ["v*"]
+    branches: ["**"]
+    paths:
+      - "packaging/**"
+      - ".github/workflows/build-installers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15        # Apple Silicon
+            label: arm64
+          - runner: macos-15-intel  # Intel
+            label: intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: sed -i '' "s/^__version__ = .*/__version__ = \"${GITHUB_REF_NAME#v}\"/" subnetry/__init__.py
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build app and disk image
+        run: bash packaging/macos/build.sh ${{ matrix.label }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Subnetry-mac-${{ matrix.label }}
+          path: dist/Subnetry-mac-${{ matrix.label }}.dmg
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $v = "$env:GITHUB_REF_NAME".TrimStart("v")
+          (Get-Content subnetry\__init__.py) -replace '^__version__ = .*', "__version__ = `"$v`"" | Set-Content subnetry\__init__.py
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build app and installer
+        shell: pwsh
+        run: ./packaging/windows/build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Subnetry-windows-x64
+          path: dist/Subnetry-Setup-windows-x64.exe
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Subnetry ${{ github.ref_name }}
+          files: installers/*
+          generate_release_notes: true
+          body: |
+            ## Download
+            - **Mac (Apple Silicon: M1 and newer):** Subnetry-mac-arm64.dmg
+            - **Mac (Intel):** Subnetry-mac-intel.dmg
+            - **Windows 10/11 (64-bit):** Subnetry-Setup-windows-x64.exe
+
+            First launch: macOS may say it can't verify the app (click Done, then System Settings > Privacy &
+            Security > Open Anyway); Windows SmartScreen may say "Windows protected your PC" (More info > Run anyway).
+            This is because the app isn't code-signed yet.

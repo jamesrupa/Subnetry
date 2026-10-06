@@ -28,6 +28,19 @@ from ..system import IS_MAC, CmdResult, run_cmd_sync
 
 SOURCE_DIR = Path(__file__).resolve().parent.parent / "macos_helper"
 APP_NAME = "Subnetry Wi-Fi Helper.app"
+
+
+def _prebuilt() -> Path:
+    """The helper built at release time by packaging/macos/build.sh, inside Subnetry.app's Resources,
+    so users of the downloadable app don't need Apple's developer tools."""
+    import sys
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent.parent / "Resources" / APP_NAME
+    return SOURCE_DIR / "prebuilt" / APP_NAME
+
+
+PREBUILT = _prebuilt()
 EXECUTABLE = "subnetry-wifi-helper"
 BAND = {1: "2.4 GHz", 2: "5 GHz", 3: "6 GHz"}
 
@@ -126,6 +139,13 @@ def ensure_built() -> Path:
     wanted = source_hash()
     with _build_lock:
         if (app / "Contents" / "MacOS" / EXECUTABLE).is_file() and stamp.is_file() and stamp.read_text().strip() == wanted:
+            return app
+        if PREBUILT.is_dir():  # the packaged app ships a helper built (and ad-hoc signed) at release time
+            support_dir().mkdir(parents=True, exist_ok=True)
+            if app.exists():
+                shutil.rmtree(app)
+            shutil.copytree(PREBUILT, app, symlinks=True)
+            stamp.write_text(wanted)
             return app
         swiftc = _find_swiftc()
         if not swiftc:

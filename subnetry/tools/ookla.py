@@ -40,6 +40,9 @@ def find_speedtest() -> str | None:
         extra = ["/opt/homebrew/bin/speedtest", "/usr/local/bin/speedtest"]
     else:
         extra = []
+    from ..system import tools_bin_dir
+
+    extra = [str(tools_bin_dir() / ("speedtest.exe" if IS_WINDOWS else "speedtest")), *extra]
     return find_tool("speedtest", extra)
 
 

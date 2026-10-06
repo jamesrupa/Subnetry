@@ -139,6 +139,7 @@ document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("cli
 // Sidebar icons (simple 16px line drawings).
 const ICONS = {
   dashboard: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6.5h12M6.5 6.5V14"/>',
+  setup: '<path d="M10.2 2.3a3.3 3.3 0 0 0-3.9 4.4L2.4 10.6a1.4 1.4 0 0 0 2 2l3.9-3.9a3.3 3.3 0 0 0 4.4-3.9l-2 2-1.8-.7-.7-1.8z"/>',
   health: '<path d="M2 8h3l2-4 2 8 2-4h3"/>',
   overview: '<rect x="2.5" y="2.5" width="4.5" height="4.5"/><rect x="9" y="2.5" width="4.5" height="4.5"/><rect x="2.5" y="9" width="4.5" height="4.5"/><rect x="9" y="9" width="4.5" height="4.5"/>',
   ip: '<circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/>',

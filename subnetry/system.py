@@ -12,6 +12,25 @@ OS = platform.system()  # "Windows", "Darwin", "Linux"
 IS_WINDOWS = OS == "Windows"
 IS_MAC = OS == "Darwin"
 IS_LINUX = OS == "Linux"
+# True inside the packaged app (PyInstaller): there's no source checkout, Python or pip.
+FROZEN = bool(getattr(__import__("sys"), "frozen", False))
+
+
+def app_data_dir():
+    """Per-user folder for Subnetry's own files (downloaded tools, window cache, helper app)."""
+    import os
+    from pathlib import Path
+
+    if IS_WINDOWS:
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Subnetry"
+    if IS_MAC:
+        return Path.home() / "Library" / "Application Support" / "Subnetry"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "subnetry"
+
+
+def tools_bin_dir():
+    """Where Subnetry puts tools it downloads itself (e.g. the Speedtest.net CLI)."""
+    return app_data_dir() / "bin"
 
 # Subprocesses run in a dedicated thread pool instead of asyncio's subprocess API:
 # it behaves the same under every event loop (uvicorn on Windows included) and lets
