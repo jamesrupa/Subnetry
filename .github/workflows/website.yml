@@ -1,6 +1,7 @@
 name: Website
 
-# Publishes website/ to GitHub Pages (https://jamesrupa.github.io/Subnetry/).
+# Publishes website/ to GitHub Pages at https://subnetry.com/ (custom domain set in Settings > Pages; with an
+# Actions deployment GitHub ignores CNAME files, so the domain lives in the repository settings).
 # One-time setup: repository Settings > Pages > Build and deployment > Source: "GitHub Actions".
 on:
   push:

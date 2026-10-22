@@ -26,7 +26,7 @@ for nearby Wi-Fi networks. The dashboard shows the results live.
 
 ## Download
 
-**Website:** https://jamesrupa.github.io/Subnetry/
+**Website:** https://subnetry.com/
 
 Ready-to-run apps (no Python or Git needed):
 
