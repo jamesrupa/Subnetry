@@ -1,0 +1,35 @@
+name: Website
+
+# Publishes website/ to GitHub Pages (https://jamesrupa.github.io/Subnetry/).
+# One-time setup: repository Settings > Pages > Build and deployment > Source: "GitHub Actions".
+on:
+  push:
+    branches: ["claude/network-diagnostic-tool-u487tr", "main"]
+    paths:
+      - "website/**"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: website
+      - id: deployment
+        uses: actions/deploy-pages@v4

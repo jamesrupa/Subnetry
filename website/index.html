@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Subnetry</title>
+  <meta name="description" content="Subnetry is a free network diagnostics app for Mac and Windows: speed test, Wi-Fi channel analysis, device and port scanning, traceroute and a health check that tells you exactly what to change.">
+  <meta property="og:title" content="Subnetry: network diagnostics for Mac and Windows">
+  <meta property="og:description" content="Speed test, Wi-Fi analysis, device and port scans, traceroute and a health score with the changes that fix it.">
+  <meta property="og:image" content="https://jamesrupa.github.io/Subnetry/assets/og-image.jpg">
+  <meta property="og:url" content="https://jamesrupa.github.io/Subnetry/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#060a12">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href="#" aria-label="Subnetry home">
+      <img src="assets/icon.svg" alt="" width="28" height="28">
+      <span>SUBNETRY</span>
+    </a>
+    <nav class="top-nav" aria-label="Main">
+      <a href="#tools">Tools</a>
+      <a href="#download">Download</a>
+      <a href="#install">Install</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#faq">FAQ</a>
+      <a class="gh" href="https://github.com/jamesrupa/Subnetry">GitHub ↗</a>
+    </nav>
+  </div>
+  <div class="telemetry" aria-label="Download status">
+    <div class="wrap telemetry-row">
+      <span><i class="dot" id="t-dot"></i><b id="t-state">CHECKING</b></span>
+      <span>SYSTEM <b id="t-os">–</b></span>
+      <span>LATEST <b id="t-version">–</b></span>
+      <span class="hide-sm">RELEASED <b id="t-date">–</b></span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Network diagnostics for Mac and Windows</p>
+        <h1>Find out what's slowing your network down, and how to fix it.</h1>
+        <p class="lede">Subnetry tests your speed, maps your Wi-Fi channels, finds every device and open port, and traces the route to the internet.
+          Then it scores your network and tells you the exact setting to change.</p>
+        <div class="cta">
+          <a class="btn primary" id="hero-download" href="#download">Download Subnetry</a>
+          <a class="btn ghost" href="#tools">See the tools</a>
+        </div>
+        <p class="cta-note" id="hero-note">Free · No account · Your results stay on your computer</p>
+      </div>
+      <figure class="screen hero-screen">
+        <div class="sweep" aria-hidden="true"></div>
+        <img src="assets/shots/dashboard.webp" width="1440" height="900"
+             alt="The Subnetry dashboard: online status, Wi-Fi signal of -54 dBm, 486 Mbps download, a health score of 70 and a live latency chart.">
+        <figcaption>Dashboard · live latency, signal and your latest results</figcaption>
+      </figure>
+    </div>
+    <div class="wrap">
+      <dl class="readouts">
+        <div><dt>Speed test</dt><dd>Speedtest.net</dd></div>
+        <div><dt>Wi-Fi bands</dt><dd>2.4 · 5 · 6 GHz</dd></div>
+        <div><dt>Port scan</dt><dd>Top 1,000 ports</dd></div>
+        <div><dt>Health score</dt><dd>0–100</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band" id="tools" aria-labelledby="tools-title">
+    <div class="wrap">
+      <p class="eyebrow">Everything in one app</p>
+      <h2 id="tools-title">Fourteen tools, explained in plain English</h2>
+      <p class="section-lede">Every result comes with what it means and what to do about it, so you don't need to be a network engineer to use it.</p>
+      <div class="groups">
+        <section class="group">
+          <h3>Diagnose</h3>
+          <dl>
+            <dt>Health Check</dt><dd>A quick or full scan that ends in a score out of 100 and a ranked list of fixes, saved as a report.</dd>
+          </dl>
+        </section>
+        <section class="group">
+          <h3>Network</h3>
+          <dl>
+            <dt>Speed Test</dt><dd>Download, upload, ping, jitter and packet loss.</dd>
+            <dt>Network Scanner</dt><dd>Every device on your network, with its maker and open ports.</dd>
+            <dt>Traceroute</dt><dd>Each hop to a website, who runs it, and where delay starts.</dd>
+            <dt>Port Scanner</dt><dd>Nmap scans with versions and operating-system guesses.</dd>
+            <dt>Overview · Public IP</dt><dd>Your addresses, router, DNS servers and internet provider.</dd>
+          </dl>
+        </section>
+        <section class="group">
+          <h3>Wi-Fi</h3>
+          <dl>
+            <dt>Wi-Fi Scanner</dt><dd>Nearby networks and the quietest channel on each band.</dd>
+            <dt>Wi-Fi Monitor</dt><dd>A live signal graph for finding weak spots as you walk around.</dd>
+          </dl>
+        </section>
+        <section class="group">
+          <h3>Traffic</h3>
+          <dl>
+            <dt>Traffic Analyzer</dt><dd>What your computer is talking to, using Wireshark's engine.</dd>
+          </dl>
+        </section>
+        <section class="group">
+          <h3>Toolkit</h3>
+          <dl>
+            <dt>Subnet Calculator</dt><dd>Ranges, masks and host counts, shown in binary.</dd>
+            <dt>DNS Lookup</dt><dd>Every record explained, including email security.</dd>
+            <dt>MAC Vendor Lookup · Port Reference</dt><dd>Who made a device, and what a port is for.</dd>
+          </dl>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="spotlights" aria-label="Highlights">
+    <div class="wrap">
+      <article class="spot">
+        <figure class="screen"><img src="assets/shots/health.webp" width="1440" height="900" loading="lazy"
+          alt="Health Check results: a score of 70 out of 100 and three fixes worth 10 points each, starting with changing the Wi-Fi channel from 36 to 153."></figure>
+        <div class="spot-copy">
+          <p class="eyebrow">Health Check</p>
+          <h2>A score, and the three changes that raise it</h2>
+          <p>The full scan runs a speed test, a traceroute, a device and port scan and a Wi-Fi scan in a few minutes. Each problem
+            costs points, and the fixes are ranked by how much they're worth.</p>
+          <ul class="ticks">
+            <li>Spots open services like Telnet, Remote Desktop and unprotected databases</li>
+            <li>Saves an HTML report plus CSV lists of your devices and Wi-Fi networks</li>
+          </ul>
+        </div>
+      </article>
+      <article class="spot flip">
+        <figure class="screen"><img src="assets/shots/wifi.webp" width="1440" height="900" loading="lazy"
+          alt="Wi-Fi Scanner: 14 access points, channel usage charts for 2.4, 5 and 6 GHz, and a recommendation to move from channel 36 to 153."></figure>
+        <div class="spot-copy">
+          <p class="eyebrow">Wi-Fi</p>
+          <h2>The quietest channel, on every band</h2>
+          <p>See every network around you on 2.4, 5 and 6 GHz, with signal in dBm and which channels overlap. Subnetry recommends
+            1, 6 or 11 on 2.4 GHz, a channel without radar checks on 5 GHz, and a preferred scanning channel on 6 GHz.</p>
+          <ul class="ticks">
+            <li>Ignores your own mesh nodes when counting neighbours</li>
+            <li>Wi-Fi Monitor catches weak spots and devices clinging to a distant access point</li>
+          </ul>
+        </div>
+      </article>
+      <article class="spot">
+        <figure class="screen"><img src="assets/shots/traceroute.webp" width="1440" height="900" loading="lazy"
+          alt="Traceroute to google.com: the route from your network through your ISP, Comcast and Lumen to Google, with a latency bar for each hop."></figure>
+        <div class="spot-copy">
+          <p class="eyebrow">Traceroute</p>
+          <h2>See the road your traffic takes</h2>
+          <p>Every hop to a website, with its name, the network that runs it and its country. Subnetry tells you whether delay starts
+            at your router, at your internet provider, or is simply the distance to another continent.</p>
+          <ul class="ticks">
+            <li>Explains which silent hops are normal and which packet loss is real</li>
+            <li>Works the same on Mac and Windows</li>
+          </ul>
+        </div>
+      </article>
+      <article class="spot flip">
+        <figure class="screen"><img src="assets/shots/toolkit.webp" width="1440" height="900" loading="lazy"
+          alt="Subnet Calculator for 192.168.1.42/24: network 192.168.1.0, 254 usable hosts, broadcast 192.168.1.255, and the address in binary."></figure>
+        <div class="spot-copy">
+          <p class="eyebrow">Toolkit</p>
+          <h2>The reference tools you keep opening tabs for</h2>
+          <p>A subnet calculator that shows network and host bits in binary, a DNS lookup that decodes SPF, DKIM and DMARC,
+            a MAC vendor lookup and a reference of common ports and how risky they are to leave open.</p>
+          <ul class="ticks">
+            <li>Works offline, except DNS lookups</li>
+            <li>Handy for learning networking as well as fixing it</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="band" id="download" aria-labelledby="download-title">
+    <div class="wrap">
+      <p class="eyebrow">Download</p>
+      <h2 id="download-title">Get Subnetry</h2>
+      <p class="section-lede" id="dl-status">Free for Mac and Windows. Everything it needs is included.</p>
+      <div class="downloads">
+        <article class="dl" data-platform="mac-arm64">
+          <h3>Mac</h3>
+          <p class="dl-sub">Apple Silicon: M1 and newer</p>
+          <p class="dl-meta"><span>macOS 11 or later</span><span data-size>.dmg</span></p>
+          <a class="btn primary" href="https://github.com/jamesrupa/Subnetry/releases/latest/download/Subnetry-mac-arm64.dmg" data-asset="Subnetry-mac-arm64.dmg">Download for Mac</a>
+        </article>
+        <article class="dl" data-platform="mac-intel">
+          <h3>Mac</h3>
+          <p class="dl-sub">Intel processor</p>
+          <p class="dl-meta"><span>macOS 11 or later</span><span data-size>.dmg</span></p>
+          <a class="btn" href="https://github.com/jamesrupa/Subnetry/releases/latest/download/Subnetry-mac-intel.dmg" data-asset="Subnetry-mac-intel.dmg">Download for Intel Mac</a>
+        </article>
+        <article class="dl" data-platform="windows">
+          <h3>Windows</h3>
+          <p class="dl-sub">Windows 10 and 11, 64-bit</p>
+          <p class="dl-meta"><span>Installer</span><span data-size>.exe</span></p>
+          <a class="btn" href="https://github.com/jamesrupa/Subnetry/releases/latest/download/Subnetry-Setup-windows-x64.exe" data-asset="Subnetry-Setup-windows-x64.exe">Download for Windows</a>
+        </article>
+      </div>
+      <p class="fine">Not sure which Mac you have? Open the Apple menu › <b>About This Mac</b>. "Chip: Apple M…" means Apple Silicon; "Processor: Intel" means Intel.
+        On Linux, <a href="https://github.com/jamesrupa/Subnetry#quick-start-from-source">run it from source</a>.
+        <span id="dl-release"></span></p>
+    </div>
+  </section>
+
+  <section class="install" id="install" aria-labelledby="install-title">
+    <div class="wrap">
+      <p class="eyebrow">Install</p>
+      <h2 id="install-title">Up and running in a minute</h2>
+      <div class="tabs" role="tablist" aria-label="Your system">
+        <button type="button" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="true">Mac</button>
+        <button type="button" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="false" tabindex="-1">Windows</button>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-mac" aria-labelledby="tab-mac">
+        <ol class="steps">
+          <li><b>Open the .dmg</b> and drag Subnetry onto the Applications folder.</li>
+          <li><b>Open Subnetry</b> from Applications or Launchpad.</li>
+          <li><b>If macOS says it can't verify Subnetry,</b> click Done, then open System Settings › Privacy &amp; Security, scroll down
+            and click <b>Open Anyway</b>. On macOS 14 and earlier you can instead right-click the app and choose Open. You only do this once.</li>
+          <li><b>Allow it to find devices on your local network</b> when macOS asks. The scanners need it.</li>
+          <li><b>Optional:</b> open the Wi-Fi Scanner and press Allow location access. macOS only shows Wi-Fi network names to apps with
+            Location access; Subnetry never uses your location.</li>
+        </ol>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-win" aria-labelledby="tab-win" hidden>
+        <ol class="steps">
+          <li><b>Run the installer.</b> It installs for your user account, so it doesn't need administrator rights.</li>
+          <li><b>If SmartScreen says "Windows protected your PC",</b> click More info › <b>Run anyway</b>.</li>
+          <li><b>Tick the optional tools you want</b> (Speedtest.net CLI, Nmap, Wireshark). Their own installers open; keep Npcap ticked.</li>
+          <li><b>Open Subnetry</b> from the Start menu or the desktop shortcut.</li>
+          <li><b>For Wi-Fi names,</b> turn on Settings › Privacy &amp; security › Location, including "Let desktop apps access your location".</li>
+        </ol>
+      </div>
+      <p class="fine">The security prompts appear because Subnetry isn't code-signed by Apple or Microsoft yet. To update, download the new
+        version and install it over the old one; your saved reports are kept.</p>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="extras-title">
+    <div class="wrap">
+      <p class="eyebrow">Optional extras</p>
+      <h2 id="extras-title">Three free tools unlock even more</h2>
+      <p class="section-lede">Subnetry works on its own. Its Setup page shows what's missing and installs these with one click where it can.</p>
+      <div class="table-scroll">
+        <table class="extras">
+          <thead><tr><th scope="col">Tool</th><th scope="col">Adds</th><th scope="col">Without it</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Speedtest.net CLI</th><td>Official Speedtest.net results</td><td>Speed tests use Cloudflare instead</td></tr>
+            <tr><th scope="row">Nmap</th><td>The Port Scanner tab and faster port checks</td><td>The Full Scan uses Subnetry's built-in scanner</td></tr>
+            <tr><th scope="row">Wireshark</th><td>The Traffic Analyzer</td><td>Traffic Analyzer is unavailable</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="privacy" id="privacy" aria-labelledby="privacy-title">
+    <div class="wrap privacy-grid">
+      <div>
+        <p class="eyebrow">Privacy</p>
+        <h2 id="privacy-title">It runs on your computer, not in the cloud</h2>
+        <p>There's no account and no tracking. Scan results and reports are saved only on your computer, in a folder called Subnetry-Reports.</p>
+        <p>Some tests have to reach the internet. These are the only times Subnetry does:</p>
+      </div>
+      <ul class="contacts">
+        <li><b>Speed tests</b><span>Speedtest.net or Cloudflare test servers</span></li>
+        <li><b>Your public IP</b><span>ipinfo.io, ipwho.is and ipify, to show your provider and location</span></li>
+        <li><b>DNS lookups</b><span>The DNS server you choose (your network's, Cloudflare, Google or Quad9)</span></li>
+        <li><b>Traceroute names</b><span>Team Cymru's free service, to name the network behind each hop</span></li>
+        <li><b>Only if you use them</b><span>DNSDumpster with your own key, and the IEEE device-maker list when you press Update</span></li>
+      </ul>
+    </div>
+    <div class="wrap">
+      <p class="fine use">Only scan networks and devices you own or have permission to test. Port scans of other people's systems can break their terms of use or the law.</p>
+    </div>
+  </section>
+
+  <section class="band" id="faq" aria-labelledby="faq-title">
+    <div class="wrap narrow">
+      <p class="eyebrow">Questions</p>
+      <h2 id="faq-title">FAQ</h2>
+      <details>
+        <summary>Is Subnetry free?</summary>
+        <p>Yes. There are no paid tiers, ads or accounts.</p>
+      </details>
+      <details>
+        <summary>Why does my Mac or PC warn me when I first open it?</summary>
+        <p>Apple and Microsoft show a warning for apps that aren't signed with a paid developer certificate. Subnetry isn't signed yet, so you
+          confirm once that you want to open it (see Install above). After that it opens normally.</p>
+      </details>
+      <details>
+        <summary>Why can't I see Wi-Fi network names?</summary>
+        <p>macOS and Windows 11 hide nearby network names from apps without Location permission, because they could reveal where you are.
+          Allow location access when asked. Subnetry uses it only to read Wi-Fi details.</p>
+      </details>
+      <details>
+        <summary>Can it see what other people on my network are doing?</summary>
+        <p>No. On Wi-Fi and modern home networks a computer only sees its own traffic plus announcements other devices broadcast.
+          The Network Scanner finds devices and their open ports; it doesn't read anyone's traffic.</p>
+      </details>
+      <details>
+        <summary>Does it change my router settings?</summary>
+        <p>Never. Subnetry only measures and recommends. You make any change yourself, in your router's settings.</p>
+      </details>
+      <details>
+        <summary>Does it work on Linux?</summary>
+        <p>Yes, from source: it needs Python 3.10 or newer. The <a href="https://github.com/jamesrupa/Subnetry#quick-start-from-source">instructions are on GitHub</a>.</p>
+      </details>
+      <details>
+        <summary>How do I uninstall it?</summary>
+        <p>Mac: drag Subnetry from Applications to the Trash. Windows: Settings › Apps › Installed apps › Subnetry › Uninstall.
+          Your reports stay in the Subnetry-Reports folder until you delete it.</p>
+      </details>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-row">
+    <span class="brand small"><img src="assets/icon.svg" alt="" width="20" height="20"> SUBNETRY</span>
+    <span>Network diagnostics for Mac and Windows</span>
+    <span class="foot-links">
+      <a href="https://github.com/jamesrupa/Subnetry">Source code</a>
+      <a href="https://github.com/jamesrupa/Subnetry/releases">All releases</a>
+      <a href="https://github.com/jamesrupa/Subnetry/issues">Report a problem</a>
+    </span>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

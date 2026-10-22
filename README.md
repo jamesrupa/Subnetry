@@ -26,6 +26,8 @@ for nearby Wi-Fi networks. The dashboard shows the results live.
 
 ## Download
 
+**Website:** https://jamesrupa.github.io/Subnetry/
+
 Ready-to-run apps (no Python or Git needed):
 
 | System | File |
@@ -213,6 +215,13 @@ Some background on the techniques used:
 pip install -e ".[dev]"
 pytest
 ```
+
+### The website
+
+`website/` is a static site (plain HTML, CSS and JS, no build step) published to GitHub Pages by
+`.github/workflows/website.yml` whenever it changes. It reads the latest release from the GitHub API to show the
+version and file sizes, and highlights the right download for the visitor's computer. The screenshots in
+`website/assets/shots/` are taken from the app with sample data.
 
 ### Building the installers
 

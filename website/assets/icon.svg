@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#10213a"/>
+      <stop offset="1" stop-color="#050a14"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity=".55"/>
+    </linearGradient>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#22d3ee" stroke-opacity=".07" stroke-width="2"/>
+    </pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="tile"><rect x="64" y="64" width="896" height="896" rx="200"/></clipPath>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <g clip-path="url(#tile)">
+    <rect x="64" y="64" width="896" height="896" fill="url(#grid)"/>
+    <circle cx="512" cy="512" r="400" fill="url(#halo)"/>
+  </g>
+  <!-- radar rings -->
+  <g fill="none" stroke="#22d3ee" stroke-width="18">
+    <circle cx="512" cy="512" r="300" stroke-opacity=".35"/>
+    <circle cx="512" cy="512" r="200" stroke-opacity=".55"/>
+    <circle cx="512" cy="512" r="100" stroke-opacity=".8"/>
+  </g>
+  <!-- sweep wedge -->
+  <path d="M512 512 L812 512 A300 300 0 0 0 724 300 Z" fill="url(#sweep)"/>
+  <line x1="512" y1="512" x2="724" y2="300" stroke="#a5f3fc" stroke-width="16" stroke-linecap="round" filter="url(#glow)"/>
+  <!-- network nodes -->
+  <g stroke="#22d3ee" stroke-width="12" stroke-opacity=".7">
+    <line x1="512" y1="512" x2="300" y2="660"/>
+    <line x1="512" y1="512" x2="660" y2="690"/>
+    <line x1="300" y1="660" x2="660" y2="690"/>
+  </g>
+  <g filter="url(#glow)" fill="#22d3ee">
+    <circle cx="300" cy="660" r="34"/>
+    <circle cx="660" cy="690" r="34"/>
+    <circle cx="672" cy="352" r="30" fill="#a5f3fc"/>
+    <circle cx="512" cy="512" r="46" fill="#e0fbff"/>
+  </g>
+</svg>
