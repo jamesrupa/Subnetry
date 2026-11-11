@@ -11,6 +11,7 @@ Host discovery combines three signals, because many devices ignore ping:
 from __future__ import annotations
 
 import asyncio
+import errno
 import ipaddress
 import re
 import socket
@@ -186,6 +187,53 @@ async def reverse_dns(ip: str, timeout: float = 2.0) -> str | None:
     return name[0]
 
 
+# --- "only found myself" diagnosis --------------------------------------------------
+
+MAC_LOCAL_NETWORK_HELP = (
+    "macOS is blocking Subnetry from reaching other devices on your network. Open System Settings › "
+    "Privacy & Security › Local Network, turn Subnetry on, then quit and reopen Subnetry and scan again."
+)
+
+
+async def local_network_blocked(gateway: str | None) -> bool:
+    """macOS's Local Network privacy check makes connections to LAN devices fail at once with
+    'No route to host', even to the router, which certainly exists."""
+    if not (IS_MAC and gateway):
+        return False
+    for port in (53, 80, 443):
+        t0 = time.perf_counter()
+        try:
+            _, writer = await asyncio.wait_for(asyncio.open_connection(gateway, port), 2.0)
+        except ConnectionRefusedError:
+            return False  # the router answered: the network is reachable
+        except asyncio.TimeoutError:
+            continue
+        except OSError as exc:
+            if exc.errno in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EPERM) and time.perf_counter() - t0 < 1.0:
+                return True
+            continue
+        writer.close()
+        return False
+    return False
+
+
+def lonely_scan_notice(net: ipaddress.IPv4Network, others: int, own_ips: set[str], gateway: str | None,
+                       blocked: bool) -> str | None:
+    """Explain a scan that found nothing but this computer."""
+    if others:
+        return None
+    if blocked:
+        return MAC_LOCAL_NETWORK_HELP
+    if gateway and ipaddress.IPv4Address(gateway) not in net:
+        return (f"Only this computer was found, and your router ({gateway}) isn't on {net}. You may have picked a "
+                "VPN or virtual-machine network: choose your Wi-Fi or Ethernet network in the list and scan again.")
+    if not any(ipaddress.IPv4Address(ip) in net for ip in own_ips):
+        return f"This computer isn't on {net}, so devices there can't be reached directly."
+    return ("Only this computer answered. If you're on guest Wi-Fi or a network with 'client isolation' "
+            "(common in offices, hotels and some mesh systems), devices are hidden from each other. "
+            "A VPN that routes all traffic can also hide your local network.")
+
+
 # --- scans ------------------------------------------------------------------------
 
 async def scan_network(
@@ -240,6 +288,12 @@ async def scan_network(
         if "arp" not in host["methods"]:
             host["methods"].append("arp")
         yield {"type": "host", "host": host}
+
+    others = sum(1 for ip in found if ip not in own_ips)
+    blocked = not others and await local_network_blocked(gateway)
+    notice = lonely_scan_notice(net, others, own_ips, gateway, blocked)
+    if notice:
+        yield {"type": "notice", "message": notice, "permission": blocked}
 
     yield {
         "type": "done",

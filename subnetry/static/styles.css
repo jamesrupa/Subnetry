@@ -168,6 +168,7 @@ input { font-family: var(--mono); width: 170px; }
 .progress div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
 .status { color: var(--text-secondary); margin: 10px 0; white-space: pre-line; }
 .status.error { color: var(--critical); }
+.scan-notice { display: inline-block; margin-top: 6px; color: var(--warning); line-height: 1.45; }
 
 /* --- tables ------------------------------------------------------------------- */
 .table-wrap {

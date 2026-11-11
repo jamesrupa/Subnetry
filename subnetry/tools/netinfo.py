@@ -48,8 +48,43 @@ def interfaces() -> list[dict]:
     return result
 
 
+# Adapters that belong to VPNs, virtual machines, containers or phone tethering, not the real LAN.
+_VIRTUAL_IFACE = re.compile(
+    r"^(utun|tun|tap|ppp|ipsec|gif|stf|bridge|vmnet|vnic|vboxnet|docker|br-|veth|virbr|llw|awdl|anpi|ap\d|zt|tailscale|wg)"
+    r"|vethernet|virtualbox|vmware|hyper-v|host-only|wsl|loopback|bluetooth|tailscale|zerotier|wireguard|vpn|openvpn|teredo|isatap",
+    re.I,
+)
+
+
+def primary_ipv4() -> str | None:
+    """The local address the OS uses to reach the internet (connecting a UDP socket sends nothing)."""
+    for probe in ("8.8.8.8", "1.1.1.1"):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect((probe, 53))
+                addr = s.getsockname()[0]
+        except OSError:
+            continue
+        if addr and not addr.startswith(("0.", "127.")):
+            return addr
+    return None
+
+
+def rank_networks(nets: list[dict], primary: str | None) -> list[dict]:
+    """Put the real LAN first: the one carrying internet traffic, then physical adapters, then virtual ones."""
+    def key(n: dict) -> tuple:
+        net = ipaddress.IPv4Network(n["network"])
+        return (
+            n["address"] != primary,
+            bool(_VIRTUAL_IFACE.search(n["interface"])),
+            not net.is_private,
+            net.prefixlen >= 31,
+        )
+    return sorted(nets, key=key)
+
+
 def local_networks() -> list[dict]:
-    """IPv4 networks this machine is directly attached to (candidates for a LAN scan)."""
+    """IPv4 networks this machine is directly attached to (candidates for a LAN scan), best guess first."""
     nets = []
     for iface in interfaces():
         if not iface["is_up"]:
@@ -61,7 +96,7 @@ def local_networks() -> list[dict]:
             if ip.is_loopback or ip.is_link_local:
                 continue
             nets.append({"interface": iface["name"], "address": a["address"], "network": a["network"]})
-    return nets
+    return rank_networks(nets, primary_ipv4())
 
 
 def parse_proc_net_route(text: str) -> str | None:

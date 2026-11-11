@@ -82,6 +82,8 @@ async def _devices(report: dict) -> AsyncIterator[dict]:
             hosts[ev["host"]["ip"]] = ev["host"]
         elif ev["type"] == "error":
             net["error"] = ev["message"]
+        elif ev["type"] == "notice":
+            net["notice"] = ev["message"]
         elif ev["type"] == "done":
             net["seconds"] = ev["seconds"]
         yield ev

@@ -275,6 +275,10 @@ def network_rules(network: dict | None, system: dict | None) -> list[dict]:
     if network.get("error"):
         return [rec("info", "Network", "Device scan unavailable", network["error"])]
     hosts = network.get("hosts", [])
+    if network.get("notice"):
+        out.append(rec("warning", "Network", "Only this computer was found",
+                       "The device scan couldn't see anything else on the network, so device and port checks are incomplete.",
+                       network["notice"]))
     gw = network.get("gateway") or (system or {}).get("gateway")
     if not gw:
         out.append(rec("warning", "Network", "No default gateway",

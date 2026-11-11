@@ -325,10 +325,10 @@ def findings(target: str, target_ip: str | None, hops: list[dict], info: dict[st
 # --- run -----------------------------------------------------------------------------------------
 
 async def run(target: str, max_hops: int = DEFAULT_HOPS, resolve: bool = True) -> AsyncIterator[dict]:
+    target = validate_target(target)
     exe = find_command()
     if not exe:
         raise TraceError("traceroute isn't available. " + INSTALL_HELP.get(platform.system(), ""))
-    target = validate_target(target)
     args = build_args(exe, target, max_hops)
     parse = parse_windows_line if IS_WINDOWS else parse_unix_line
     started = time.perf_counter()

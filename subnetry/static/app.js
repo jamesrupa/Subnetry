@@ -684,15 +684,17 @@ $("#scan-form").addEventListener("submit", (e) => {
   $("#scan-radar").innerHTML = radarSVG(36);
   renderHosts();
   bar.style.width = "0";
-  let failed = false;
+  let failed = false, notice = "";
   const params = new URLSearchParams({ timeout: $("#scan-timeout").value });
   if (cidr) params.set("cidr", cidr);
   stream(`/api/scan?${params}`, (ev) => {
     if (ev.type === "start") setStatus(status, `Scanning ${esc(ev.network)} (${ev.total} addresses)…`);
     if (ev.type === "progress") bar.style.width = `${(100 * ev.done) / ev.total}%`;
     if (ev.type === "host") { hosts.set(ev.host.ip, { ...hosts.get(ev.host.ip), ...ev.host }); renderHosts(); }
+    if (ev.type === "notice") notice = ev.message;
     if (ev.type === "done") {
-      setStatus(status, `Found <b class="found-count">0</b> device${ev.hosts_found === 1 ? "" : "s"} on ${esc(ev.network)} in ${ev.seconds}s.`);
+      setStatus(status, `Found <b class="found-count">0</b> device${ev.hosts_found === 1 ? "" : "s"} on ${esc(ev.network)} in ${ev.seconds}s.`
+        + (notice ? `<br><span class="scan-notice">${esc(notice)}</span>` : ""));
       animateNumber(status.querySelector(".found-count"), ev.hosts_found, { duration: 600 });
     }
     if (ev.type === "error") { failed = true; setStatus(status, esc(ev.message), true); }
@@ -978,7 +980,8 @@ function startDiagnosis(mode) {
         if (e.type === "start") update("devices", { detail: `Scanning ${e.network}…` });
         if (e.type === "host") { hosts.set(e.host.ip, { ...hosts.get(e.host.ip), ...e.host }); renderHosts(); }
         if (e.type === "progress") update("devices", { detail: `${e.done} / ${e.total} addresses checked · ${hosts.size} devices found` });
-        if (e.type === "done") update("devices", { detail: `${e.hosts_found} devices found on ${e.network}` });
+        if (e.type === "notice") { update("devices", { detail: e.message, noticed: true }); return; }
+        if (e.type === "done" && !step("devices").noticed) update("devices", { detail: `${e.hosts_found} devices found on ${e.network}` });
       } else if (ev.step === "ports") {
         if (e.type === "notice") { update("ports", { detail: e.message }); return; }
         if (e.type === "progress") { update("ports", { detail: `Nmap: ${Math.round(e.percent)}% done` }); return; }

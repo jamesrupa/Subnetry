@@ -227,3 +227,34 @@ def test_dns_api_validation():
     body = client.get("/api/dns/explainers").json()
     assert {"SPF", "DMARC", "TTL"} <= {x["type"] for x in body["explainers"]}
     assert "cloudflare" in body["resolvers"]
+
+# --- Network scanner: picking the right LAN, explaining empty scans ---------------------------
+
+import ipaddress  # noqa: E402
+
+from subnetry.tools import netinfo, netscan  # noqa: E402
+
+
+def test_rank_networks_prefers_internet_lan():
+    nets = [
+        {"interface": "bridge100", "address": "192.168.64.1", "network": "192.168.64.0/24"},
+        {"interface": "Ethernet 2", "address": "192.168.56.1", "network": "192.168.56.0/24"},
+        {"interface": "utun4", "address": "10.8.0.2", "network": "10.8.0.0/24"},
+        {"interface": "en0", "address": "192.168.1.20", "network": "192.168.1.0/24"},
+        {"interface": "vEthernet (WSL)", "address": "172.20.0.1", "network": "172.20.0.0/20"},
+    ]
+    assert netinfo.rank_networks(nets, "192.168.1.20")[0]["interface"] == "en0"
+    # Without a route to the internet, physical adapters still beat VPN/VM ones.
+    order = [n["interface"] for n in netinfo.rank_networks(nets, None)]
+    assert order.index("en0") < order.index("bridge100") and order.index("en0") < order.index("utun4")
+    assert order.index("vEthernet (WSL)") > order.index("en0")
+
+
+def test_lonely_scan_notice():
+    net = ipaddress.IPv4Network("192.168.56.0/24")
+    own = {"192.168.56.1", "192.168.1.20"}
+    assert netscan.lonely_scan_notice(net, 3, own, "192.168.1.1", False) is None
+    assert "Local Network" in netscan.lonely_scan_notice(net, 0, own, "192.168.1.1", True)
+    assert "VPN or virtual-machine" in netscan.lonely_scan_notice(net, 0, own, "192.168.1.1", False)
+    home = ipaddress.IPv4Network("192.168.1.0/24")
+    assert "client isolation" in netscan.lonely_scan_notice(home, 0, own, "192.168.1.1", False)
