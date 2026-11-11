@@ -237,6 +237,9 @@ def _python_for_launcher() -> str:
     return str(exe)
 
 
+LAUNCHER_REVISION = "subnetry-launcher 3"
+
+
 def macos_app_path(apps_dir: Path | None = None) -> Path:
     return (apps_dir or Path.home() / "Applications") / "Subnetry.app"
 
@@ -272,8 +275,12 @@ def build_macos_app(apps_dir: Path | None = None, python: str | None = None) -> 
         "# Starts Subnetry's desktop window with the Python environment it was installed from.\n"
         f'mkdir -p "{log.parent}"\n'
         f'cd "{PROJECT_DIR}" || exit 1\n'
+        f"# {LAUNCHER_REVISION}\n"
+        "# Python runs as a child (no exec) so this signed app stays the 'responsible' process: macOS then\n"
+        "# checks Subnetry.app's Local Network declaration and permission, not Python's.\n"
         "export SUBNETRY_LAUNCHER=app\n"
-        f'exec "{python or _python_for_launcher()}" -m subnetry --app >>"{log}" 2>&1\n'
+        f'"{python or _python_for_launcher()}" -m subnetry --app >>"{log}" 2>&1\n'
+        "exit $?\n"
     )
     launcher.chmod(0o755)
     # A signature (even ad-hoc) lets macOS remember the Local Network permission for the app.
@@ -302,9 +309,9 @@ def refresh_macos_launcher(apps_dir: Path | None = None) -> bool:
         return False
     if info.get("CFBundleIdentifier") != APP_ID or str(PROJECT_DIR) not in launcher:
         return False  # not ours, or belongs to a different copy of Subnetry
-    if "NSLocalNetworkUsageDescription" in info and "SUBNETRY_LAUNCHER" in launcher:
+    if "NSLocalNetworkUsageDescription" in info and LAUNCHER_REVISION in launcher:
         return False
-    m = re.search(r'exec "([^"]+)" -m subnetry', launcher)
+    m = re.search(r'^(?:exec )?"([^"]+)" -m subnetry', launcher, re.M)
     try:
         build_macos_app(apps_dir, python=m.group(1) if m else None)
     except OSError:
