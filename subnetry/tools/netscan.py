@@ -196,6 +196,7 @@ _TERMINALS = {"Apple_Terminal": "Terminal", "iTerm.app": "iTerm", "vscode": "Vis
 def mac_local_network_help() -> str:
     """Which app macOS needs Local Network permission for depends on how Subnetry was started."""
     import os
+    import sys
 
     from ..system import FROZEN
 
@@ -203,7 +204,7 @@ def mac_local_network_help() -> str:
     if FROZEN or os.environ.get("SUBNETRY_LAUNCHER") == "app":
         return (f"macOS is blocking Subnetry from reaching other devices on your network. {steps}, turn Subnetry on, "
                 "then quit and reopen Subnetry and scan again. If Subnetry isn't in that list, run "
-                "`python3 -m subnetry --install-app` from the Subnetry folder to rebuild the app, open it again, "
+                f"`\"{sys.executable}\" -m subnetry --install-app` from the Subnetry folder to rebuild the app, open it again, "
                 "and click Allow when macOS asks.")
     term = _TERMINALS.get(os.environ.get("TERM_PROGRAM", ""), "your terminal app")
     return (f"macOS is blocking Subnetry from reaching other devices on your network. Subnetry was started from "
