@@ -237,7 +237,7 @@ def _python_for_launcher() -> str:
     return str(exe)
 
 
-LAUNCHER_REVISION = "subnetry-launcher 3"
+LAUNCHER_REVISION = "subnetry-launcher 4"
 
 
 def macos_app_path(apps_dir: Path | None = None) -> Path:
@@ -276,11 +276,8 @@ def build_macos_app(apps_dir: Path | None = None, python: str | None = None) -> 
         f'mkdir -p "{log.parent}"\n'
         f'cd "{PROJECT_DIR}" || exit 1\n'
         f"# {LAUNCHER_REVISION}\n"
-        "# Python runs as a child (no exec) so this signed app stays the 'responsible' process: macOS then\n"
-        "# checks Subnetry.app's Local Network declaration and permission, not Python's.\n"
         "export SUBNETRY_LAUNCHER=app\n"
-        f'"{python or _python_for_launcher()}" -m subnetry --app >>"{log}" 2>&1\n'
-        "exit $?\n"
+        f'exec "{python or _python_for_launcher()}" -m subnetry --app >>"{log}" 2>&1\n'
     )
     launcher.chmod(0o755)
     # A signature (even ad-hoc) lets macOS remember the Local Network permission for the app.

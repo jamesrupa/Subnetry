@@ -275,17 +275,15 @@ def test_old_mac_launcher_gets_local_network_key(tmp_path, monkeypatch):
     del info["NSLocalNetworkUsageDescription"]
     plist.write_bytes(plistlib.dumps(info))
     script = app / "Contents" / "MacOS" / "Subnetry"
-    script.write_text(script.read_text().replace(desktop_app.LAUNCHER_REVISION, "")
-                      .replace('"/opt/py/bin/python3" -m', 'exec "/opt/py/bin/python3" -m'))
+    script.write_text(script.read_text().replace(desktop_app.LAUNCHER_REVISION, ""))
     assert desktop_app.refresh_macos_launcher(tmp_path)
     assert "NSLocalNetworkUsageDescription" in plistlib.loads(plist.read_bytes())
-    text = script.read_text()
-    assert '\n"/opt/py/bin/python3" -m subnetry' in text and "exec " not in text
+    assert 'exec "/opt/py/bin/python3" -m subnetry' in script.read_text()
 
 
 def test_mac_local_network_help_names_the_right_app(monkeypatch):
     monkeypatch.setenv("SUBNETRY_LAUNCHER", "app")
-    assert "turn Subnetry on" in netscan.mac_local_network_help()
+    assert ".dmg" in netscan.mac_local_network_help()
     monkeypatch.delenv("SUBNETRY_LAUNCHER")
     monkeypatch.setenv("TERM_PROGRAM", "Apple_Terminal")
     assert "turn Terminal on" in netscan.mac_local_network_help()

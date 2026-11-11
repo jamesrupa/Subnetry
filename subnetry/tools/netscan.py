@@ -201,11 +201,14 @@ def mac_local_network_help() -> str:
     from ..system import FROZEN
 
     steps = "Open System Settings › Privacy & Security › Local Network"
-    if FROZEN or os.environ.get("SUBNETRY_LAUNCHER") == "app":
+    if FROZEN:
         return (f"macOS is blocking Subnetry from reaching other devices on your network. {steps}, turn Subnetry on, "
-                "then quit and reopen Subnetry and scan again. If Subnetry isn't in that list, run "
-                f"`\"{sys.executable}\" -m subnetry --install-app` from the Subnetry folder to rebuild the app, open it again, "
-                "and click Allow when macOS asks.")
+                "then quit and reopen Subnetry and scan again.")
+    if os.environ.get("SUBNETRY_LAUNCHER") == "app":
+        return ("macOS is blocking Subnetry from reaching other devices on your network. This copy runs from the "
+                "source code, which macOS won't list under Local Network. Install Subnetry from its .dmg instead, "
+                f"or start it from Terminal (`\"{sys.executable}\" -m subnetry --app` in the Subnetry folder) and "
+                "allow Terminal when macOS asks.")
     term = _TERMINALS.get(os.environ.get("TERM_PROGRAM", ""), "your terminal app")
     return (f"macOS is blocking Subnetry from reaching other devices on your network. Subnetry was started from "
             f"{term}, so the permission belongs to {term}: {steps}, turn {term} on, then quit and reopen {term} and "
