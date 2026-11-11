@@ -189,10 +189,26 @@ async def reverse_dns(ip: str, timeout: float = 2.0) -> str | None:
 
 # --- "only found myself" diagnosis --------------------------------------------------
 
-MAC_LOCAL_NETWORK_HELP = (
-    "macOS is blocking Subnetry from reaching other devices on your network. Open System Settings › "
-    "Privacy & Security › Local Network, turn Subnetry on, then quit and reopen Subnetry and scan again."
-)
+_TERMINALS = {"Apple_Terminal": "Terminal", "iTerm.app": "iTerm", "vscode": "Visual Studio Code",
+              "WarpTerminal": "Warp", "ghostty": "Ghostty", "WezTerm": "WezTerm"}
+
+
+def mac_local_network_help() -> str:
+    """Which app macOS needs Local Network permission for depends on how Subnetry was started."""
+    import os
+
+    from ..system import FROZEN
+
+    steps = "Open System Settings › Privacy & Security › Local Network"
+    if FROZEN or os.environ.get("SUBNETRY_LAUNCHER") == "app":
+        return (f"macOS is blocking Subnetry from reaching other devices on your network. {steps}, turn Subnetry on, "
+                "then quit and reopen Subnetry and scan again. If Subnetry isn't in that list, run "
+                "`python3 -m subnetry --install-app` from the Subnetry folder to rebuild the app, open it again, "
+                "and click Allow when macOS asks.")
+    term = _TERMINALS.get(os.environ.get("TERM_PROGRAM", ""), "your terminal app")
+    return (f"macOS is blocking Subnetry from reaching other devices on your network. Subnetry was started from "
+            f"{term}, so the permission belongs to {term}: {steps}, turn {term} on, then quit and reopen {term} and "
+            "Subnetry and scan again.")
 
 
 async def local_network_blocked(gateway: str | None) -> bool:
@@ -223,7 +239,7 @@ def lonely_scan_notice(net: ipaddress.IPv4Network, others: int, own_ips: set[str
     if others:
         return None
     if blocked:
-        return MAC_LOCAL_NETWORK_HELP
+        return mac_local_network_help()
     if gateway and ipaddress.IPv4Address(gateway) not in net:
         return (f"Only this computer was found, and your router ({gateway}) isn't on {net}. You may have picked a "
                 "VPN or virtual-machine network: choose your Wi-Fi or Ethernet network in the list and scan again.")

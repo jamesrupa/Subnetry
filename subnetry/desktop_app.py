@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import plistlib
+import re
 import shutil
 import socket
 import subprocess
@@ -260,6 +261,9 @@ def build_macos_app(apps_dir: Path | None = None, python: str | None = None) -> 
             "CFBundleVersion": _version(),
             "LSMinimumSystemVersion": "11.0",
             "NSHighResolutionCapable": True,
+            # Without this, macOS 15+ silently blocks the network scanner instead of asking.
+            "NSLocalNetworkUsageDescription": "Subnetry scans your local network to find devices, check their open "
+                                              "ports and test your router.",
         }, f)
     log = Path.home() / "Library" / "Logs" / "Subnetry.log"
     launcher = app / "Contents" / "MacOS" / "Subnetry"
@@ -268,10 +272,44 @@ def build_macos_app(apps_dir: Path | None = None, python: str | None = None) -> 
         "# Starts Subnetry's desktop window with the Python environment it was installed from.\n"
         f'mkdir -p "{log.parent}"\n'
         f'cd "{PROJECT_DIR}" || exit 1\n'
+        "export SUBNETRY_LAUNCHER=app\n"
         f'exec "{python or _python_for_launcher()}" -m subnetry --app >>"{log}" 2>&1\n'
     )
     launcher.chmod(0o755)
+    # A signature (even ad-hoc) lets macOS remember the Local Network permission for the app.
+    try:
+        subprocess.run(["codesign", "--force", "--sign", "-", str(app)], capture_output=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        pass
     return app
+
+
+def refresh_macos_launcher(apps_dir: Path | None = None) -> bool:
+    """Rebuild a launcher made by an older version that lacks the Local Network declaration.
+
+    macOS silently blocks the network scanner for such an app; the rebuilt one asks for permission
+    from its next launch. Returns True if it was rebuilt.
+    """
+    from .system import FROZEN
+
+    if sys.platform != "darwin" or FROZEN:
+        return False
+    app = macos_app_path(apps_dir)
+    try:
+        info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
+        launcher = (app / "Contents" / "MacOS" / "Subnetry").read_text()
+    except (OSError, plistlib.InvalidFileException, ValueError):
+        return False
+    if info.get("CFBundleIdentifier") != APP_ID or str(PROJECT_DIR) not in launcher:
+        return False  # not ours, or belongs to a different copy of Subnetry
+    if "NSLocalNetworkUsageDescription" in info and "SUBNETRY_LAUNCHER" in launcher:
+        return False
+    m = re.search(r'exec "([^"]+)" -m subnetry', launcher)
+    try:
+        build_macos_app(apps_dir, python=m.group(1) if m else None)
+    except OSError:
+        return False
+    return True
 
 
 def _version() -> str:

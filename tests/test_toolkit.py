@@ -258,3 +258,32 @@ def test_lonely_scan_notice():
     assert "VPN or virtual-machine" in netscan.lonely_scan_notice(net, 0, own, "192.168.1.1", False)
     home = ipaddress.IPv4Network("192.168.1.0/24")
     assert "client isolation" in netscan.lonely_scan_notice(home, 0, own, "192.168.1.1", False)
+
+
+def test_old_mac_launcher_gets_local_network_key(tmp_path, monkeypatch):
+    import plistlib
+
+    from subnetry import desktop_app
+
+    monkeypatch.setattr(desktop_app.sys, "platform", "darwin")
+    app = desktop_app.build_macos_app(tmp_path, python="/opt/py/bin/python3")
+    plist = app / "Contents" / "Info.plist"
+    info = plistlib.loads(plist.read_bytes())
+    assert "NSLocalNetworkUsageDescription" in info
+    assert not desktop_app.refresh_macos_launcher(tmp_path)  # already current
+    # Simulate a launcher from an older version: no Local Network key, no SUBNETRY_LAUNCHER.
+    del info["NSLocalNetworkUsageDescription"]
+    plist.write_bytes(plistlib.dumps(info))
+    script = app / "Contents" / "MacOS" / "Subnetry"
+    script.write_text(script.read_text().replace("export SUBNETRY_LAUNCHER=app\n", ""))
+    assert desktop_app.refresh_macos_launcher(tmp_path)
+    assert "NSLocalNetworkUsageDescription" in plistlib.loads(plist.read_bytes())
+    assert 'exec "/opt/py/bin/python3" -m subnetry' in script.read_text()
+
+
+def test_mac_local_network_help_names_the_right_app(monkeypatch):
+    monkeypatch.setenv("SUBNETRY_LAUNCHER", "app")
+    assert "turn Subnetry on" in netscan.mac_local_network_help()
+    monkeypatch.delenv("SUBNETRY_LAUNCHER")
+    monkeypatch.setenv("TERM_PROGRAM", "Apple_Terminal")
+    assert "turn Terminal on" in netscan.mac_local_network_help()

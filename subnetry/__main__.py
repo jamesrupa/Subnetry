@@ -111,6 +111,7 @@ def _main() -> None:
         print(desktop_app.uninstall_launcher())
         return
     if args.app:
+        desktop_app.refresh_macos_launcher()
         if desktop_app.run_window(args.host, args.port):
             return
         print(desktop_app.WEBVIEW_HELP, "Opening Subnetry in your browser instead.", file=sys.stderr)
